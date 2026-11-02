@@ -1,0 +1,19 @@
+services:
+  igra:
+    build: .
+    image: enota-za-zveze-igra
+    container_name: enota-za-zveze
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Geslo za prijavo organizatorja na /admin.html. Spremeni ga v datoteki .env.
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Nastavi ADMIN_PASSWORD v datoteki .env}
+      # Nastavi na 1 samo, če je pred vsebnikom obratni proxy (Caddy, Nginx, Traefik).
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      TZ: Europe/Ljubljana
+    volumes:
+      - podatki:/data
+
+volumes:
+  podatki:

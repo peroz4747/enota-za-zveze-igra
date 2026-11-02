@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="sl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Prijava organizatorja · Enota za zveze</title>
+<style>
+:root{--bg:#191c12;--panel:#232817;--line:#4a5333;--fg:#e4dcbf;--muted:#a39d7c;--accent:#d2b24a;--bad:#cf5a45;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
+.card{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:22px;display:flex;flex-direction:column;gap:14px}
+h1{margin:0;font-size:22px;text-transform:uppercase;letter-spacing:.05em}
+.eyebrow{font:11px ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+label{font:11px ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+input{width:100%;font:inherit;font-size:16px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:10px 12px;margin-top:6px}
+button,a.btn{font:600 15px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;background:var(--accent);color:#1a160a;border:0;border-radius:4px;padding:11px 14px;cursor:pointer;text-align:center;text-decoration:none}
+button.sec{background:transparent;color:var(--fg);border:1px solid var(--line)}
+p{margin:0}.muted{color:var(--muted);font-size:13px}.err{color:var(--bad)}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="eyebrow">Enota za zveze · organizator</div>
+  <h1 id="t">Prijava organizatorja</h1>
+  <div id="form">
+    <label for="pw">Geslo organizatorja</label>
+    <input id="pw" type="password" autocomplete="current-password">
+  </div>
+  <p class="err" id="err" hidden></p>
+  <button id="go">Prijava</button>
+  <p class="muted" id="info">Po prijavi se na začetnem zaslonu igre prikaže gumb »Organizator«. Prijava velja samo v tem zavihku brskalnika in največ 12 ur.</p>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+function loggedIn(){try{return !!sessionStorage.getItem('ezz-admin')}catch(e){return false}}
+function render(){if(loggedIn()){$('#t').textContent='Prijavljen kot organizator';$('#form').hidden=true;$('#go').textContent='Odpri igro';$('#go').onclick=()=>{location.href='/'};
+  if(!$('#out')){const b=document.createElement('button');b.id='out';b.className='sec';b.textContent='Odjava';b.onclick=async()=>{try{await fetch('/api/logout',{method:'POST',headers:{'X-Admin':sessionStorage.getItem('ezz-admin')||''}})}catch(e){}sessionStorage.removeItem('ezz-admin');location.reload()};$('#go').after(b)}}
+  else{$('#go').onclick=login;$('#pw').onkeydown=e=>{if(e.key==='Enter')login()};$('#pw').focus()}}
+async function login(){const err=$('#err');err.hidden=true;$('#go').disabled=true;
+  try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('#pw').value})});const j=await r.json();
+    if(!r.ok){err.textContent=r.status===429?'Preveč poskusov. Počakaj minuto.':'Napačno geslo.';err.hidden=false}else{sessionStorage.setItem('ezz-admin',j.token);render()}}
+  catch(e){err.textContent='Strežnik ni dosegljiv.';err.hidden=false}
+  $('#go').disabled=false}
+render();
+</script>
+</body>
+</html>

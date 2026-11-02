@@ -1,0 +1,14 @@
+{
+  "name": "enota-za-zveze-igra",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Enota za zveze — nagradna igra za vojaške zveze",
+  "scripts": {
+    "start": "node server/server.mjs"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
