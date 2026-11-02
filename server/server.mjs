@@ -23,9 +23,9 @@ if (!env('ADMIN_PASSWORD')) console.warn('Opozorilo: ADMIN_PASSWORD ni nastavlje
 // ---------- shramba v datotekah (isti vmesnik kot Netlify Blobs) ----------
 const STORE_DIR = path.join(DATA, 'store');
 fs.mkdirSync(STORE_DIR, { recursive: true });
-const enc = k => Buffer.from(k, 'utf8').toString('base64url');
-const dec = f => Buffer.from(f, 'base64url').toString('utf8');
-const fileOf = k => path.join(STORE_DIR, enc(k));
+// Ime datoteke je zgoščena vrednost ključa (ključi so lahko daljši od 255 znakov),
+// ključ sam pa je zapisan v prvi vrstici datoteke.
+const fileOf = k => path.join(STORE_DIR, crypto.createHash('sha256').update(k).digest('hex') + '.rec');
 async function writeAtomic(file, data) {
   const tmp = file + '.' + crypto.randomBytes(4).toString('hex') + '.tmp';
   await fsp.writeFile(tmp, data);
@@ -33,16 +33,23 @@ async function writeAtomic(file, data) {
 }
 let keyCache = null;
 async function allKeys() {
-  if (!keyCache) keyCache = new Set((await fsp.readdir(STORE_DIR)).filter(f => !f.endsWith('.tmp')).map(dec));
+  if (!keyCache) {
+    keyCache = new Set();
+    for (const f of await fsp.readdir(STORE_DIR)) {
+      if (!f.endsWith('.rec')) continue;
+      try { const t = await fsp.readFile(path.join(STORE_DIR, f), 'utf8'); keyCache.add(t.slice(0, t.indexOf('\n'))); } catch (e) {}
+    }
+  }
   return keyCache;
 }
+async function put(key, text) { await writeAtomic(fileOf(key), key + '\n' + text); (await allKeys()).add(key); }
 const store = {
   async get(key, opts) {
-    try { const t = await fsp.readFile(fileOf(key), 'utf8'); return opts && opts.type === 'json' ? JSON.parse(t) : t; }
+    try { let t = await fsp.readFile(fileOf(key), 'utf8'); t = t.slice(t.indexOf('\n') + 1); return opts && opts.type === 'json' ? JSON.parse(t) : t; }
     catch (e) { if (e.code === 'ENOENT') return null; throw e; }
   },
-  async setJSON(key, val) { await writeAtomic(fileOf(key), JSON.stringify(val)); (await allKeys()).add(key); },
-  async set(key, val) { await writeAtomic(fileOf(key), String(val)); (await allKeys()).add(key); },
+  async setJSON(key, val) { await put(key, JSON.stringify(val)); },
+  async set(key, val) { await put(key, String(val)); },
   async delete(key) { try { await fsp.unlink(fileOf(key)); } catch (e) { if (e.code !== 'ENOENT') throw e; } (await allKeys()).delete(key); },
   async list({ prefix = '' } = {}) { const ks = [...(await allKeys())].filter(k => k.startsWith(prefix)).sort(); return { blobs: ks.map(key => ({ key })) }; }
 };
