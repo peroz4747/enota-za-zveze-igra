@@ -47,10 +47,12 @@ Način izbereš v plošči organizatorja, razdelek *Nagradna igra*.
 | Način | Kako igralec sodeluje | Nadzor |
 |---|---|---|
 | **S kontaktom** | Vpiše telefon ali e-pošto. | Šteje najboljši rezultat osebe. |
-| **S skupno QR kodo** | Vsi skenirajo isto kodo s plakata, vsak telefon dobi svojo kodo (`#id=…` v naslovu). Kontakt ni potreben. | Ponovno skeniranje da novo kodo: velja pravilo *ena nagrada na osebo*. |
-| **Samo s karticami** | Vsak dobi natisnjeno kartico z unikatno QR kodo. Brez kartice se igra za vajo. | Strežnik šteje poskuse na kartico (1, 2, 3, 5 ali neomejeno). |
+| **S skupno QR kodo** | Vsi skenirajo isto kodo s plakata, vsak telefon dobi svojo kodo. Kontakt ni potreben. | Koda je vezana na napravo, ime na kodo (strežnik). Gumba *Naslednji igralec* ni. Zasebni zavihek ali drug brskalnik da novo kodo: velja pravilo *ena nagrada na osebo*. |
+| **Samo s karticami** | Vsak dobi natisnjeno kartico z unikatno QR kodo. Brez kartice se igra za vajo. | Strežnik šteje poskuse na kartico (1, 2, 3, 5 ali neomejeno), ime je vezano na kartico. |
 
 Kartica deluje v vseh načinih: kdor jo ima, mu kontakta ni treba vpisati.
+
+Če pri skupni QR kodi isto napravo prevzame drug igralec, v plošči organizatorja klikni *Ponastavi kodo te naprave*.
 
 **Plakat s skupno QR kodo:** vpiši naslov, ki ga odprejo telefoni (npr. `http://10.70.84.229:8080`, ne `localhost`), in po želji ime Wi-Fi omrežja, nato klikni *Natisni plakat s QR kodo*.
 
