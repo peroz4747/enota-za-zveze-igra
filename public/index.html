@@ -1665,14 +1665,15 @@ const MODE_LABEL={full:'Polna igra',quick:'Hitra igra',all:'Vse'};
 let DB=null,USER=null,UID=null,IS_OWNER=false,boardMode='all',lastMe=null;
 (async()=>{try{if(window.claude&&typeof window.claude.use==='function'){USER=await window.claude.use('user');DB=await window.claude.use('db');if(USER){UID=await USER.id();IS_OWNER=!!(await USER.isOwner())}if(!UID)DB=null;fillBoard(lastMe);renderOwnerSlot();loadMapCfg();await loadGameCfg();const pv=normCode(hashParam('potrdilo'));if(pv&&game.phase==='title'){showVerify(pv)}else if(game.phase==='title'&&$('#cardInfo'))refreshCardInfo()}}catch(e){DB=null}})();
 /* ---------- kartice in potrdila za nagradno igro ---------- */
-let GAMECFG={cardsRequired:false,maxTries:3};
+let GAMECFG={mode:'contact',cardsRequired:false,maxTries:3};
+const PRIZE_MODES={contact:'S kontaktom',shared:'S skupno QR kodo',cards:'Samo s karticami'};
 const CARD_ABC='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const newCode=()=>{const a=new Uint8Array(8);crypto.getRandomValues(a);const s=[...a].map(b=>CARD_ABC[b%CARD_ABC.length]).join('');return s.slice(0,4)+'-'+s.slice(4)};
 const normCode=v=>{const t=String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/O/g,'0').replace(/I/g,'1').replace(/L/g,'1');return t.length===8?t.slice(0,4)+'-'+t.slice(4):null};
 const okCode=c=>!!c&&/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c)&&[...c.replace('-','')].every(ch=>CARD_ABC.includes(ch));
 function hashParam(k){const m=location.hash.match(new RegExp('[#&]'+k+'=([^&]+)'));return m?decodeURIComponent(m[1]):null}
 function clearHash(){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){location.hash=''}}
-async function loadGameCfg(){if(!DB)return;try{const g=await DB.doc('config/game').get();const d=g.exists?g.data()||{}:{};GAMECFG={cardsRequired:!!d.cardsRequired,maxTries:Number.isFinite(+d.maxTries)?+d.maxTries:3}}catch(e){}}
+async function loadGameCfg(){if(!DB)return;try{const g=await DB.doc('config/game').get();const d=g.exists?g.data()||{}:{};const mode=PRIZE_MODES[d.mode]?d.mode:d.cardsRequired?'cards':'contact';GAMECFG={mode,cardsRequired:mode==='cards',maxTries:Number.isFinite(+d.maxTries)?+d.maxTries:3}}catch(e){}}
 async function cardExists(code){if(!DB)return null;try{return(await DB.doc('cards/'+code).get()).exists}catch(e){return null}}
 const qrSVG=(t,size)=>window.QR?window.QR.svg(t,{size,ecl:'M'}):'';
 const verifyURL=code=>location.origin+location.pathname+'#potrdilo='+code;
@@ -1687,6 +1688,9 @@ function resultsHTML(code,res){if(res===null)return'<p class="warn">Rezultatov n
 async function showVerify(code){const card=modal(`<div class="hd"><div class="eyebrow">Nagradna igra · potrdilo</div><h2>Koda ${esc(code)}</h2><p class="lede">Rezultati te kode za danes. Nagrado prejmejo prvi trije v vsakem načinu, ki sodelujejo v nagradni igri.</p></div><div id="vbox"><p class="muted">Nalagam …</p></div><div class="btnrow"><button class="btn primary" id="vclose">Na začetni zaslon</button></div>`);
   $('#vclose',card).onclick=()=>{clearHash();closeModal();titleScreen()};$('#vbox',card).innerHTML=resultsHTML(code,await codeResults(code))}
 function claimHTML(code,isCard){return`<div class="claim"><div class="claim-qr">${qrSVG(verifyURL(code),132)}</div><div><div class="eyebrow">${isCard?'Tvoja kartica':'Tvoja osebna koda'}</div><div class="claim-code">${esc(code)}</div><p class="muted small">${isCard?'Kartico shrani in jo pokaži ob podelitvi nagrad.':'Fotografiraj to kodo in jo pokaži ob podelitvi nagrad.'} Organizator jo skenira in vidi tvoj rezultat in mesto.</p></div></div>`}
+// plakat s skupno QR kodo (A4)
+function printPoster(base,wifi){const w=window.open('','_blank');if(!w){toast('Brskalnik je blokiral novo okno. Dovoli pojavna okna za to stran.');return}
+  const url=base.replace(/\/+$/,'')+'/';w.document.open();w.document.write(`<!doctype html><html lang="sl"><head><meta charset="utf-8"><title>Plakat · Enota za zveze</title><style>@page{size:A4;margin:14mm}body{margin:0;font:16px system-ui,sans-serif;color:#111;text-align:center}.p{display:flex;flex-direction:column;align-items:center;gap:6mm;padding-top:8mm}h1{font-size:40px;letter-spacing:.14em;margin:0}h2{font-size:18px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#555;margin:0}svg{width:120mm;height:120mm}.steps{text-align:left;font-size:17px;line-height:1.5;max-width:150mm}.u{font:14px ui-monospace,monospace;color:#444}.bar{padding:10px;font:14px system-ui;text-align:left}@media print{.bar{display:none}}</style></head><body><div class="bar"><button onclick="print()">Natisni</button></div><div class="p"><h1>ENOTA ZA ZVEZE</h1><h2>Nagradna igra</h2>${qrSVG(url,420)}<ol class="steps">${wifi?`<li>Poveži se na Wi-Fi <b>${esc(wifi)}</b>.</li>`:''}<li>Skeniraj kodo s kamero telefona.</li><li>Vpiši ime in igraj. Vsak telefon dobi svojo kodo.</li><li>Na koncu pokaži QR potrdilo organizatorju in prevzemi nagrado.</li></ol><div class="u">${esc(url)}</div></div></body></html>`);w.document.close()}
 // tiskanje kartic (8 na stran A4)
 function printCards(codes,base,w){w=w||window.open('','_blank');if(!w){toast('Brskalnik je blokiral novo okno. Dovoli pojavna okna za to stran.');return}
   const cells=codes.map(c=>`<div class="c"><div class="t">ENOTA ZA ZVEZE</div><div class="s">nagradna igra</div>${qrSVG(base.replace(/\/+$/,'')+'/#k='+c,170)}<div class="k">${c}</div><div class="i">Poveži se na Wi-Fi in skeniraj kodo s kamero telefona. Kartico shrani do podelitve nagrad.</div></div>`).join('');
@@ -1707,7 +1711,7 @@ async function fillBoard(meId){lastMe=meId||null;if(!$('#lbBox'))return;let rows
   if(mode!=='all')rows=rows.filter(r=>(r.mode||'full')===mode);
   rows=bestPer(rows);const box=$('#lbBox');if(!box||mode!==boardMode)return;
   box.innerHTML=lbTable(rows,meId)+`<p class="muted small">${shared?'Skupna lestvica današnjega dne, en (najboljši) rezultat na osebo v vsakem načinu. Medalje označujejo najboljše tri v vsakem načinu, ki sodelujejo v nagradni igri.':'Lestvica je shranjena samo na tej napravi.'}</p>`}
-async function saveRun(run){run.pk=await personKey();run.card=game.card||null;run.claim=game.card?null:game.claim||null;run.prize=game.card?true:GAMECFG.cardsRequired?false:!(game.contact&&game.contact.noContact);const list=lbLoad();list.push(run);lbSave(list.slice(-300));if(!DB)return false;
+async function saveRun(run){run.pk=await personKey();run.card=game.card||null;run.claim=game.card?null:game.claim||null;run.prize=game.card?true:GAMECFG.mode==='cards'?false:GAMECFG.mode==='shared'?true:!(game.contact&&game.contact.noContact);const list=lbLoad();list.push(run);lbSave(list.slice(-300));if(!DB)return false;
   try{await DB.collection('scores').doc(run.id).set({name:run.name,score:run.score,won:run.won,day:run.day,at:run.at,uid:UID,final:pct(run.final),mode:run.mode,pk:run.pk,prize:run.prize,...(run.card?{card:run.card}:run.claim?{claim:run.claim}:{})});
     try{const g=await DB.doc('scores/'+run.id).get();if(g.exists){const d=g.data();run.prize=d.prize;run.over=!!d.over;lbSave(lbLoad().map(x=>x.id===run.id?{...x,prize:d.prize}:x))}}catch(e){}
     await DB.doc(`contacts/${UID}`).set({at:run.at});
@@ -1759,17 +1763,23 @@ async function ownerGate(){let doc=null;try{const g=await DB.doc('admin/pin').ge
 async function renderCardsAdmin(root){const box=$('#ocards',root);if(!box)return;await loadGameCfg();
   let list=[];try{const q=await DB.collection('cards').get();list=q.docs.map(d=>({...d.data(),id:d.id}))}catch(e){}
   const batches={};list.sort((a,b)=>(a.at||0)-(b.at||0)).forEach(c=>{const b=c.batch||'—';(batches[b]=batches[b]||[]).push(c)});
-  const isLocal=/^(localhost|127\.|\[::1\])/.test(location.hostname);
-  box.innerHTML=`<h3>Kartice za nagradno igro</h3>
-    <label class="animrow" for="reqSw"><span class="switch"><input type="checkbox" id="reqSw" role="switch" ${GAMECFG.cardsRequired?'checked':''}><span class="knob"></span></span><span class="animtxt"><b>Nagradna igra samo s kartico</b><span>${GAMECFG.cardsRequired?'Vklopljeno: brez kartice se lahko igra, rezultat pa ne šteje za nagrado.':'Izklopljeno: kartica ni obvezna, brez nje igralec sodeluje s kontaktom.'}</span></span></label>
+  const MODE_DESC={contact:'Igralec vpiše telefon ali e-pošto. Kartica je neobvezna.',shared:'Vsi skenirajo isto QR kodo s plakata, vsak telefon dobi svojo kodo. Kontakt ni potreben, nagrado prevzame s QR potrdilom na koncu igre. Ponovno skeniranje da novo kodo, zato velja pravilo ena nagrada na osebo.',cards:'Vsak igralec dobi natisnjeno kartico. Brez kartice se lahko igra za vajo, rezultat pa ne šteje. Poskuse na kartico šteje strežnik.'};
+  box.innerHTML=`<h3>Nagradna igra</h3>
+    <div class="btnrow"><label class="muted small" for="pMode">Način</label><select id="pMode" class="dateinp">${Object.entries(PRIZE_MODES).map(([k,t])=>`<option value="${k}" ${GAMECFG.mode===k?'selected':''}>${t}</option>`).join('')}</select></div>
+    <p class="muted small">${MODE_DESC[GAMECFG.mode]}</p>
+    <div class="btnrow"><input id="cardBase" class="dateinp" style="flex:1;min-width:200px" value="${esc((()=>{try{return localStorage.getItem('ezz-card-base')}catch(e){return null}})()||location.origin)}" aria-label="Naslov igre"><input id="wifiName" class="dateinp" style="width:170px" placeholder="Ime Wi-Fi (neobvezno)" value="${esc((()=>{try{return localStorage.getItem('ezz-wifi')||''}catch(e){return''}})())}" aria-label="Ime Wi-Fi omrežja"><button class="btn sm" id="posterMake">Natisni plakat s QR kodo</button></div>
+    <p class="warn small" id="baseWarn" hidden>Naslova »localhost« telefoni ne morejo odpreti. Vpiši naslov, ki ga odprejo telefoni, npr. http://10.70.84.229:8080.</p>
+    <h3>Kartice</h3>
     <div class="btnrow"><label class="muted small" for="maxT">Štetih poskusov na kartico</label><select id="maxT" class="dateinp">${[[1,'1'],[2,'2'],[3,'3'],[5,'5'],[0,'neomejeno']].map(([v,t])=>`<option value="${v}" ${GAMECFG.maxTries===v?'selected':''}>${t}</option>`).join('')}</select></div>
-    <div class="btnrow"><input id="cardN" type="number" min="1" max="200" value="24" class="dateinp" style="width:84px" aria-label="Število kartic"><input id="cardBase" class="dateinp" style="flex:1;min-width:200px" value="${esc((()=>{try{return localStorage.getItem('ezz-card-base')}catch(e){return null}})()||location.origin)}" aria-label="Naslov igre na kartici"><button class="btn sm" id="cardMake">Ustvari in natisni kartice</button></div>
-    ${isLocal?'<p class="warn small">Naslova »localhost« telefoni ne morejo odpreti. Vpiši naslov, ki ga odprejo telefoni, npr. http://10.70.84.229:8080.</p>':'<p class="muted small">QR koda na kartici odpre igro na tem naslovu z že vpisano kodo.</p>'}
+    <div class="btnrow"><input id="cardN" type="number" min="1" max="200" value="24" class="dateinp" style="width:84px" aria-label="Število kartic"><button class="btn sm" id="cardMake">Ustvari in natisni kartice</button><span class="muted small">QR koda na kartici odpre igro na zgornjem naslovu z že vpisano kodo.</span></div>
     <p class="muted small">Ustvarjenih kartic: ${list.length}${list.length?`, uporabljenih: ${list.filter(c=>c.tries).length}`:''}.</p>
     ${Object.keys(batches).length?`<div class="btnrow"><span class="muted small">Ponovno natisni serijo:</span>${Object.entries(batches).map(([b,a])=>`<button class="btn sm" data-batch="${esc(b)}">${esc(b)} · ${a.length}</button>`).join('')}</div>`:''}
     <div class="btnrow"><input id="vcode" class="dateinp codeinp" placeholder="npr. K7Q2-M9XF" maxlength="9" aria-label="Koda kartice ali potrdila"><button class="btn sm" id="vgo">Preveri kodo</button></div><div id="vres"></div><p class="muted small" id="cardMsg"></p>`;
   const msg=$('#cardMsg',box),save=async d=>{try{const nd={...GAMECFG,...d};await DB.doc('config/game').set({...nd,at:Date.now()});GAMECFG=nd;renderCardsAdmin(root)}catch(e){msg.textContent='Nastavitve ni bilo mogoče shraniti.'}};
-  $('#reqSw',box).onchange=e=>save({cardsRequired:e.target.checked});$('#maxT',box).onchange=e=>save({maxTries:+e.target.value});
+  const bw=()=>{$('#baseWarn',box).hidden=!/^https?:\/\/(localhost|127\.|\[::1\])/i.test($('#cardBase',box).value.trim())};$('#cardBase',box).oninput=bw;bw();
+  $('#pMode',box).onchange=e=>save({mode:e.target.value,cardsRequired:e.target.value==='cards'});
+  $('#posterMake',box).onclick=()=>{const base=$('#cardBase',box).value.trim(),wifi=$('#wifiName',box).value.trim();if(!/^https?:\/\/[^\s]+$/.test(base)){msg.textContent='Naslov igre se mora začeti s http:// ali https://';return}
+    try{localStorage.setItem('ezz-card-base',base);localStorage.setItem('ezz-wifi',wifi)}catch(_){}printPoster(base,wifi)};$('#maxT',box).onchange=e=>save({maxTries:+e.target.value});
   $('#cardMake',box).onclick=async e=>{const n=clamp(Math.round(+$('#cardN',box).value||0),1,200),base=$('#cardBase',box).value.trim();
     if(!/^https?:\/\/[^\s]+$/.test(base)){msg.textContent='Naslov igre se mora začeti s http:// ali https://';return}
     try{localStorage.setItem('ezz-card-base',base)}catch(_){}
@@ -1823,15 +1833,15 @@ async function openOwner(){const card=modal(`<div class="hd"><div class="eyebrow
             toast('Vnos shranjen.');load()}catch(err){fail('Shranjevanje ni uspelo.')}}})}
     catch(e){box.innerHTML='<p class="warn">Podatkov ni bilo mogoče naložiti.</p>'}};
   $('#oload',card).onclick=load;$('#oclose',card).onclick=()=>{closeModal();titleScreen()};load()}
-function titleScreen(){game.phase='title';S=null;game.mission=1;{const hk=normCode(hashParam('k'));if(hk)game.card=hk}if(!MAPCFG.dynamic)game.seedBase=mapSeed();setTimeout(loadMapCfg,0);W=genWorld(1,0,game.seedBase+7919);BASE=renderBase();buildWorld3D();resetView();renderPanel();updateHUD();const ct=game.contact||{};
+function titleScreen(){game.phase='title';S=null;game.mission=1;{const hk=normCode(hashParam('k'));if(hk)game.card=hk;ensureClaimHash()}if(!MAPCFG.dynamic)game.seedBase=mapSeed();setTimeout(loadMapCfg,0);W=genWorld(1,0,game.seedBase+7919);BASE=renderBase();buildWorld3D();resetView();renderPanel();updateHUD();const ct=game.contact||{};
   const c=modal(`<div class="title-hero"><div class="eyebrow">Vojaške zveze · terenska simulacija · nagradna igra</div><h1>Enota za <span>zveze</span></h1><p class="lede">Vodiš enoto za zveze s klicnim znakom Maribor-7-4. Postavi poveljniško mesto, radijsko relejno postajo, končno radijsko postajo in IT tovornjak tako, da so zveze s TOC (Triglav-7-2) in enoto Alfa ena močne, sovražnik pa te ne vidi. Nato dviguj stolpe, usmerjaj antene, vodi radijski promet in ohrani omrežje.</p></div>
     <div class="how"><div><b>Polna igra · ~40 min</b>Tri misije po dva dni: postavitev, dnevni pregledi, sovražni vdor in zaključna poročila v enoti Alfa ena.</div><div><b>Hitra igra · ~15 min</b>En dan: postavitev, en dnevni pregled z radijskim prometom in zaključna poročila. Ima svojo lestvico.</div><div><b>Nagrade</b>Najboljši trije rezultati dneva v vsakem načinu prejmejo nagrado. Šteje najboljši rezultat vsake osebe.</div></div>
     <div class="field"><label for="callsign">Ime in priimek ali vzdevek (prikazano na lestvici)</label><input id="callsign" maxlength="24" autocomplete="off" value="${esc(game.name||'')}" placeholder="npr. Janez Novak"></div>
     <div class="field"><label for="cardcode">Koda kartice (če jo imaš)</label><input id="cardcode" class="codeinp" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(game.card||'')}" placeholder="npr. K7Q2-M9XF"><p class="muted small" id="cardInfo"></p></div>
     <div class="contact"><div class="field"><label for="phone">Telefon</label><input id="phone" type="tel" autocomplete="off" value="${esc(ct.phone||'')}" placeholder="npr. 041 123 456"></div><div class="field"><label for="email">E-pošta</label><input id="email" type="email" autocomplete="off" value="${esc(ct.email||'')}" placeholder="ime@primer.si"></div></div>
     <label class="check"><input type="checkbox" id="consent" ${ct.consent?'checked':''}> Strinjam se, da organizator moj telefon ali e-pošto uporabi samo za obvestilo o nagradi. Podatki se po podelitvi nagrad izbrišejo.</label>
-    <label class="check"><input type="checkbox" id="nocontact" ${ct.noContact?'checked':''}> Ne želim, da me kontaktirate (v tem primeru ne morem prejeti nagrade)</label>
-    <p class="muted small">Telefon ali e-pošto vidi samo organizator. Na lestvici je prikazano samo ime.</p>
+    <label class="check" id="nocontactRow"><input type="checkbox" id="nocontact" ${ct.noContact?'checked':''}> Ne želim, da me kontaktirate (v tem primeru ne morem prejeti nagrade)</label>
+    <p class="muted small" id="contactNote">Telefon ali e-pošto vidi samo organizator. Na lestvici je prikazano samo ime.</p>
     <p class="warn" id="formErr" hidden></p>
     <div class="btnrow"><button class="btn primary" id="start">Polna igra · ~40 min</button><button class="btn primary" id="startQ">Hitra igra · ~15 min</button><button class="btn" id="tut">Navodila</button><span id="ownerSlot"></span></div>
     ${mtPickHTML()}
@@ -1841,7 +1851,7 @@ function titleScreen(){game.phase='title';S=null;game.mission=1;{const hk=normCo
   const cc=$('#cardcode',c);let ccT=null;cc.oninput=()=>{clearTimeout(ccT);delete c.dataset.nocard;ccT=setTimeout(refreshCardInfo,350)};refreshCardInfo();
   const read=()=>({name:($('#callsign',c).value||'').trim(),contact:{phone:nc.checked?'':ph.value.trim(),email:nc.checked?'':em.value.trim(),noContact:nc.checked,consent:!nc.checked&&cs.checked}});
   const go=async mode=>{const v=read(),err=$('#formErr',c);let msg='';err.hidden=true;
-    const raw=cc.value.trim(),code=raw?normCode(raw):null,free=!!code||GAMECFG.cardsRequired;
+    const raw=cc.value.trim(),code=raw?normCode(raw):null,free=!!code||GAMECFG.mode!=='contact';
     if(!v.name)msg='Vpiši ime ali vzdevek.';
     else if(raw&&!okCode(code))msg='Koda kartice ni pravilna. Ima 8 znakov, npr. K7Q2-M9XF.';
     else if(code&&(await cardExists(code))===false)msg='Kartica s to kodo ne obstaja. Preveri kodo ali jo skeniraj znova.';
@@ -1851,13 +1861,17 @@ function titleScreen(){game.phase='title';S=null;game.mission=1;{const hk=normCo
     else if(v.contact.email&&!validEmail(v.contact.email))msg='E-poštni naslov ni veljaven.';
     else if(!v.contact.noContact&&(v.contact.phone||v.contact.email)&&!v.contact.consent)msg='Za sodelovanje v nagradni igri potrdi privolitev za uporabo kontakta.';
     if(msg){err.textContent=msg;err.hidden=false;return}
-    game.card=code||null;game.claim=code?null:(game.claim||newCode());game.name=v.name;game.contact=v.contact;game.mode=mode;game.mission=1;game.dmg=0;game.results=[];closeModal();startMission(1)};
+    game.card=code||null;game.claim=code?null:(okCode(normCode(hashParam('id')))?normCode(hashParam('id')):game.claim||newCode());if(code)clearHash();game.name=v.name;game.contact=v.contact;game.mode=mode;game.mission=1;game.dmg=0;game.results=[];closeModal();startMission(1)};
   $('#start',c).onclick=()=>go('full');$('#startQ',c).onclick=()=>go('quick');
   $('#tut',c).onclick=()=>{const v=read();game.name=v.name;game.contact=v.contact;game.card=normCode(cc.value)||game.card;openTutorial(()=>titleScreen())};
   $('#lbTog',c).onclick=()=>c.classList.toggle('showlb');renderOwnerSlot();fillBoard()}
 
-async function refreshCardInfo(){const el=$('#cardInfo'),inp=$('#cardcode');if(!el||!inp)return;const raw=inp.value.trim(),code=raw?normCode(raw):null;
-  if(!raw){el.textContent=GAMECFG.cardsRequired?'Za nagradno igro potrebuješ kartico s QR kodo. Brez nje lahko igraš za vajo.':'Kartica ni obvezna. S kartico ti ni treba vpisati kontakta, nagrado prevzameš s kartico.';el.className='muted small';return}
+function applyModeUI(hasCard){const nc=$('#nocontactRow'),note=$('#contactNote'),noNeed=hasCard||GAMECFG.mode!=='contact';if(nc)nc.hidden=noNeed;if(noNeed){const x=$('#nocontact');if(x&&x.checked){x.checked=false;x.onchange&&x.onchange()}}
+  if(note)note.textContent=noNeed?'Kontakt je neobvezen. Če ga vpišeš, ga vidi samo organizator. Na lestvici je prikazano samo ime.':'Telefon ali e-pošto vidi samo organizator. Na lestvici je prikazano samo ime.';
+  const h=document.querySelector('.titlecard .how div:nth-child(3)');if(h)h.innerHTML='<b>Nagrade</b>Najboljši trije rezultati dneva v vsakem načinu prejmejo nagrado. '+(GAMECFG.mode==='contact'?'Šteje najboljši rezultat vsake osebe.':GAMECFG.mode==='shared'?'Na koncu igre dobiš QR potrdilo, ki ga pokažeš ob podelitvi. Ena nagrada na osebo.':'Za nagradno igro potrebuješ kartico s QR kodo.')}
+function ensureClaimHash(){if(game.card||hashParam('k')||hashParam('potrdilo'))return;const h=normCode(hashParam('id'));if(okCode(h)){game.claim=h;return}game.claim=game.claim||newCode();try{history.replaceState(null,'',location.pathname+location.search+'#id='+game.claim)}catch(e){}}
+async function refreshCardInfo(){const el=$('#cardInfo'),inp=$('#cardcode');if(!el||!inp)return;const raw=inp.value.trim(),code=raw?normCode(raw):null;applyModeUI(!!(code&&okCode(code)));
+  if(!raw){el.textContent=GAMECFG.mode==='cards'?'Za nagradno igro potrebuješ kartico s QR kodo. Brez nje lahko igraš za vajo.':GAMECFG.mode==='shared'?`Kartica ni potrebna. Tvoja koda je ${game.claim||''}: na koncu igre dobiš QR potrdilo, ki ga pokažeš ob podelitvi nagrad.`:'Kartica ni obvezna. S kartico ti ni treba vpisati kontakta, nagrado prevzameš s kartico.';el.className='muted small';return}
   if(!okCode(code)){el.textContent='Koda ima 8 znakov, npr. K7Q2-M9XF.';el.className='muted small';return}
   if(!DB){el.textContent='Kartice ni mogoče preveriti, ker strežnik ni dosegljiv.';el.className='warn small';return}
   let d=null;try{const g=await DB.doc('cards/'+code).get();d=g.exists?g.data():false}catch(e){}

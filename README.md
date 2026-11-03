@@ -40,15 +40,23 @@ docker run -d --name enota-za-zveze -p 8080:8080 \
 
 Naslova `admin.html` ne deli z igralci. Prijava velja v tistem zavihku največ 12 ur.
 
-## Kartice s QR kodo (nagradna igra)
+## Nagradna igra: trije načini
 
-Vsak igralec lahko dobi svojo kartico z QR kodo. Kartica je hkrati vstopnica in potrdilo za nagrado.
+Način izbereš v plošči organizatorja, razdelek *Nagradna igra*.
 
-1. **Ustvari kartice:** v plošči organizatorja, razdelek *Kartice za nagradno igro*, vpiši število kartic in naslov, ki ga odprejo telefoni (npr. `http://10.70.84.229:8080`, ne `localhost`). Klikni *Ustvari in natisni kartice*. Odpre se stran za tisk z 8 karticami na A4. Serijo lahko pozneje natisneš znova.
-2. **Igralec** skenira kartico s kamero telefona. Igra se odpre z že vpisano kodo, kontakt ni potreben. Kodo lahko tudi vpiše ročno.
-3. **Štetje poskusov:** nastaviš, koliko iger na kartico šteje za nagrado (1, 2, 3, 5 ali neomejeno). Strežnik šteje poskuse sam, igre prek omejitve so na lestvici, a ne štejejo. Šteje najboljši šteti rezultat kartice.
-4. **Nagradna igra samo s kartico:** ko je vklopljeno, se brez kartice lahko igra, rezultat pa ne šteje za nagrado. Ko je izklopljeno, igralci brez kartice sodelujejo s kontaktom kot prej in na koncu dobijo osebno kodo.
-5. **Podelitev:** na koncu igre igralec vidi QR potrdilo s svojo kodo. Organizator ga skenira s telefonom ali vpiše kodo v *Preveri kodo* in vidi ime, točke, mesto in število poskusov.
+| Način | Kako igralec sodeluje | Nadzor |
+|---|---|---|
+| **S kontaktom** | Vpiše telefon ali e-pošto. | Šteje najboljši rezultat osebe. |
+| **S skupno QR kodo** | Vsi skenirajo isto kodo s plakata, vsak telefon dobi svojo kodo (`#id=…` v naslovu). Kontakt ni potreben. | Ponovno skeniranje da novo kodo: velja pravilo *ena nagrada na osebo*. |
+| **Samo s karticami** | Vsak dobi natisnjeno kartico z unikatno QR kodo. Brez kartice se igra za vajo. | Strežnik šteje poskuse na kartico (1, 2, 3, 5 ali neomejeno). |
+
+Kartica deluje v vseh načinih: kdor jo ima, mu kontakta ni treba vpisati.
+
+**Plakat s skupno QR kodo:** vpiši naslov, ki ga odprejo telefoni (npr. `http://10.70.84.229:8080`, ne `localhost`), in po želji ime Wi-Fi omrežja, nato klikni *Natisni plakat s QR kodo*.
+
+**Kartice:** vpiši število in klikni *Ustvari in natisni kartice* (8 na A4). Serijo lahko pozneje natisneš znova.
+
+**Podelitev:** na koncu igre igralec dobi QR potrdilo s svojo kodo. Organizator ga skenira s kamero telefona ali kodo vpiše v *Preveri kodo* in vidi ime, točke, mesto v nagradni igri in število poskusov.
 
 ## Podatki in varnostne kopije
 
