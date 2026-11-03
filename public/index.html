@@ -1728,7 +1728,7 @@ function victory(){game.phase='victory';const total=totalSoFar(),fin=S&&S.final!
     <p class="muted small" id="saveMsg">Shranjujem rezultat …</p><div id="claimBox"></div>
     ${boardHTML('all')}
     <div class="fb"><div class="eyebrow">Povratne informacije</div><p class="lede">Kako ti je bila igra všeč? Kaj bi izboljšal?</p><div class="stars" role="radiogroup" aria-label="Ocena">${[1,2,3,4,5].map(n=>`<button class="star" data-r="${n}" aria-label="${n} od 5">★</button>`).join('')}</div><textarea id="fbText" rows="3" maxlength="1000" placeholder="Tvoje mnenje, predlogi, napake …"></textarea><div class="btnrow"><button class="btn" id="fbSend">Pošlji povratne informacije</button></div><p class="muted small" id="fbMsg"></p></div>
-    <div class="btnrow">${GAMECFG.mode==='shared'?'':'<button class="btn primary" id="next">Naslednji igralec</button>'}<button class="btn${GAMECFG.mode==='shared'?' primary':''}" id="again">${GAMECFG.mode==='shared'?'Igraj znova':'Poskusi znova (isti igralec)'}</button></div>${GAMECFG.mode==='shared'?'<p class="muted small">Ta naprava ima svojo kodo za nagradno igro. Vsak igralec igra na svojem telefonu.</p>':''}`);
+    <div class="btnrow">${GAMECFG.mode==='shared'?'':'<button class="btn primary" id="next">Naslednji igralec</button>'}<button class="btn${GAMECFG.mode==='shared'?' primary':''}" id="againQ" data-m="quick">Znova · Hitra igra</button><button class="btn${GAMECFG.mode==='shared'?' primary':''}" id="againF" data-m="full">Znova · Polna igra</button></div><p class="muted small">Gumba »Znova« ohranita igralca${game.card?' in kartico':''}.</p>${GAMECFG.mode==='shared'?'<p class="muted small">Ta naprava ima svojo kodo za nagradno igro. Vsak igralec igra na svojem telefonu.</p>':''}`);
   saveRun(run).then(ok=>{const m=$('#saveMsg');if(m)m.textContent=ok?(run.over?`Rezultat je na skupni lestvici, a ne šteje za nagrado: kartica je porabila vse štete poskuse (${GAMECFG.maxTries}).`:run.prize?'Rezultat je shranjen na skupni lestvici in sodeluje v nagradni igri.':'Rezultat je shranjen na skupni lestvici, v nagradni igri ne sodeluje.'):'Rezultat je shranjen samo na tej napravi.';
     const cb=$('#claimBox'),code=run.card||run.claim;if(cb&&ok&&code&&(run.prize||run.card))cb.innerHTML=claimHTML(code,!!run.card);fillBoard(run.id)});
   let rating=0;c.querySelectorAll('.star').forEach(b=>b.onclick=()=>{rating=+b.dataset.r;c.querySelectorAll('.star').forEach(x=>x.classList.toggle('on',+x.dataset.r<=rating))});
@@ -1736,7 +1736,7 @@ function victory(){game.phase='victory';const total=totalSoFar(),fin=S&&S.final!
     $('#fbSend',c).disabled=true;const ok=await saveFeedback({id:run.id,name:run.name,rating,text,day,mode,at:Date.now(),score:total});
     const box=c.querySelector('.fb');if(box)box.innerHTML=`<div class="eyebrow">Povratne informacije</div><p class="lede">Hvala za povratne informacije!${ok?'':' Shranjene so na tej napravi.'}</p>`};
   const reset=()=>{game.mission=1;game.dmg=0;game.results=[];game.seedBase=Math.floor(Math.random()*1e9)};
-  $('#again',c).onclick=()=>{closeModal();reset();startMission(1)};
+  c.querySelectorAll('#againQ,#againF').forEach(bt=>bt.onclick=()=>{closeModal();reset();game.mode=bt.dataset.m;startMission(1)});
   if($('#next',c))$('#next',c).onclick=()=>{closeModal();reset();game.name='';game.contact=null;game.card=null;game.claim=null;clearHash();titleScreen()}}
 const validPhone=v=>v.replace(/[\s+\-/()]/g,'').length>=8&&/^[\d\s+\-/()]+$/.test(v);
 const validEmail=v=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
