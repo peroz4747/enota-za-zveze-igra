@@ -14,7 +14,7 @@
   }
   async function req(method, url, body) {
     var r = await fetch(API + url, { method: method, headers: headers(), body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
-    if (!r.ok) throw { code: r.status === 403 || r.status === 400 ? 'invalid_argument' : r.status === 429 ? 'resource_exhausted' : 'unavailable', message: 'HTTP ' + r.status };
+    if (!r.ok) { var j = {}; try { j = await r.json(); } catch (e) {} throw { code: r.status === 409 ? (j.error || 'conflict') : r.status === 403 || r.status === 400 ? 'invalid_argument' : r.status === 429 ? 'resource_exhausted' : 'unavailable', message: j.error || ('HTTP ' + r.status) }; }
     return r.json();
   }
   function snap(p, d) { return { id: p.split('/').pop(), exists: !!d, data: function () { return d ? JSON.parse(JSON.stringify(d)) : undefined; }, metadata: { fromCache: false, hasPendingWrites: false } }; }
