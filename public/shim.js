@@ -1,7 +1,14 @@
 // Povezava igre s strežnikom (nadomešča shranjevanje iz claude.ai).
 (function () {
   'use strict';
-  var API = '/api';
+  // Naslov API-ja: privzeto /api (Docker, Netlify); za PHP gostovanje <script src="shim.js" data-api="api.php">
+  var me = document.currentScript, API = (me && me.getAttribute('data-api')) || '/api', PHP = /\.php$/.test(API);
+  function apiUrl(u) {
+    if (!PHP) return API + u;
+    var q = u.indexOf('?'), path = q < 0 ? u : u.slice(0, q), rest = q < 0 ? '' : '&' + u.slice(q + 1);
+    var a = ''; try { a = sessionStorage.getItem('ezz-admin') || ''; } catch (e) {}
+    return API + '?r=' + encodeURIComponent(path) + rest + '&_u=' + encodeURIComponent(uid) + (a ? '&_a=' + encodeURIComponent(a) : '');
+  }
   function rid(n) { var a = new Uint8Array(n || 12); (window.crypto || window.msCrypto).getRandomValues(a); return Array.from(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''); }
   var uid = null;
   try { uid = localStorage.getItem('ezz-uid'); } catch (e) {}
@@ -13,7 +20,7 @@
     return h;
   }
   async function req(method, url, body) {
-    var r = await fetch(API + url, { method: method, headers: headers(), body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
+    var r = await fetch(apiUrl(url), { method: method, headers: headers(), body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
     if (!r.ok) { var j = {}; try { j = await r.json(); } catch (e) {} throw { code: r.status === 409 ? (j.error || 'conflict') : r.status === 403 || r.status === 400 ? 'invalid_argument' : r.status === 429 ? 'resource_exhausted' : 'unavailable', message: j.error || ('HTTP ' + r.status) }; }
     return r.json();
   }

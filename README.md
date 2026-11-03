@@ -90,6 +90,16 @@ ADMIN_PASSWORD='mocno-geslo' npm start
 
 Podatki gredo v mapo `data/`, three.js se naloži s CDN.
 
+## Navadno spletno gostovanje s PHP (brez Dockerja)
+
+Za gostovanje brez Dockerja in Node.js (Telekom, Telemach, cPanel, Plesk …) je v mapi `php/` strežnik v PHP 7.2+, ki ne potrebuje baze. Paket za nalaganje ustvariš z:
+
+```bash
+./scripts/build-php.sh      # ustvari dist/enota-za-zveze-php.zip
+```
+
+Vsebino naložiš na strežnik (lahko v podmapo), v `config.php` nastaviš geslo in odpreš `preveri.php`. Podrobna navodila so v `php/NAVODILA.txt`.
+
 ## Netlify (neobvezno)
 
 Isti repozitorij deluje tudi na Netlify (`netlify.toml`, funkcija v `netlify/functions/api.mjs`, podatki v Netlify Blobs). V Netlify uvozi repozitorij in nastavi spremenljivko `ADMIN_PASSWORD`.

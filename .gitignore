@@ -3,3 +3,4 @@ data/
 .env
 .netlify/
 public/vendor/
+dist/

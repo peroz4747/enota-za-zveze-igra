@@ -1,0 +1,54 @@
+ENOTA ZA ZVEZE · namestitev na spletno gostovanje (PHP)
+=========================================================
+
+Kaj potrebuješ
+--------------
+- Spletno gostovanje s PHP 7.2 ali novejšim (Telekom, Telemach, cPanel, Plesk ...).
+  Baza podatkov, Node.js ali Docker NISO potrebni.
+- Dostop do datotek: FTP (npr. FileZilla) ali upravitelj datotek v nadzorni plošči.
+
+Namestitev (5 minut)
+--------------------
+1. Vsebino te mape naloži na strežnik, v javno mapo (public_html, httpdocs, www)
+   ali v podmapo, npr. public_html/igra.
+   Naloži VSE datoteke, tudi .htaccess in mapo data.
+
+2. Odpri datoteko config.php (v upravitelju datotek: Uredi) in zamenjaj
+      'spremeni-me-v-mocno-geslo'
+   s svojim geslom organizatorja. Shrani.
+
+3. V brskalniku odpri  https://tvoja-stran.si/preveri.php
+   (ali https://tvoja-stran.si/igra/preveri.php, če je v podmapi).
+   Vse točke morajo biti zelene. Če "Pisanje v mapo s podatki" ni zeleno,
+   mapi data nastavi pravice 755 (ali 775) in osveži stran.
+
+4. Ko je vse zeleno, preveri.php lahko izbrišeš.
+
+Igra je na:            https://tvoja-stran.si/          (ali .../igra/)
+Organizator:           https://tvoja-stran.si/admin.html
+
+Prijava organizatorja
+---------------------
+1. Odpri admin.html in vpiši geslo iz config.php.
+2. Klikni "Odpri igro". Na začetnem zaslonu se pojavi gumb "Organizator".
+3. Ob prvem odprtju nastavi PIN.
+
+Podatki
+-------
+- Rezultati, kontakti, kartice in nastavitve so v mapi data (vsak zapis v svoji
+  datoteki). Mapa je zaščitena in prek spleta ni berljiva.
+- Varnostna kopija: prenesi celotno mapo data.
+- Nadgradnja igre: naloži nove datoteke čez stare, mape data in datoteke
+  config.php NE prepiši.
+- Po podelitvi nagrad kontakte izbriši v plošči organizatorja (GDPR).
+
+Če kaj ne deluje
+----------------
+- Igra se odpre, rezultati pa se ne shranijo: odpri preveri.php in poglej, katera
+  točka ni zelena.
+- Napaka 500 pri api.php: preveri različico PHP v nadzorni plošči gostovanja
+  (mora biti 7.2 ali novejša, priporočeno 8.x).
+- Stran mora biti na https. Na http nekatere funkcije telefona (deljenje slike)
+  ne delujejo, igra pa deluje.
+- Igra za 3D zemljevid naloži knjižnico three.js z interneta (cdnjs, jsdelivr),
+  zato morajo imeti igralci dostop do interneta.
