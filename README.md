@@ -40,6 +40,16 @@ docker run -d --name enota-za-zveze -p 8080:8080 \
 
 Naslova `admin.html` ne deli z igralci. Prijava velja v tistem zavihku največ 12 ur.
 
+## Kartice s QR kodo (nagradna igra)
+
+Vsak igralec lahko dobi svojo kartico z QR kodo. Kartica je hkrati vstopnica in potrdilo za nagrado.
+
+1. **Ustvari kartice:** v plošči organizatorja, razdelek *Kartice za nagradno igro*, vpiši število kartic in naslov, ki ga odprejo telefoni (npr. `http://10.70.84.229:8080`, ne `localhost`). Klikni *Ustvari in natisni kartice*. Odpre se stran za tisk z 8 karticami na A4. Serijo lahko pozneje natisneš znova.
+2. **Igralec** skenira kartico s kamero telefona. Igra se odpre z že vpisano kodo, kontakt ni potreben. Kodo lahko tudi vpiše ročno.
+3. **Štetje poskusov:** nastaviš, koliko iger na kartico šteje za nagrado (1, 2, 3, 5 ali neomejeno). Strežnik šteje poskuse sam, igre prek omejitve so na lestvici, a ne štejejo. Šteje najboljši šteti rezultat kartice.
+4. **Nagradna igra samo s kartico:** ko je vklopljeno, se brez kartice lahko igra, rezultat pa ne šteje za nagrado. Ko je izklopljeno, igralci brez kartice sodelujejo s kontaktom kot prej in na koncu dobijo osebno kodo.
+5. **Podelitev:** na koncu igre igralec vidi QR potrdilo s svojo kodo. Organizator ga skenira s telefonom ali vpiše kodo v *Preveri kodo* in vidi ime, točke, mesto in število poskusov.
+
 ## Podatki in varnostne kopije
 
 Vse je v Docker volumnu `podatki` (v vsebniku `/data`), vsak zapis v svoji datoteki. Varnostna kopija:

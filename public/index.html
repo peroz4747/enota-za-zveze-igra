@@ -14,6 +14,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="/shim.js"></script>
+<script src="/qrcode.js"></script>
 <style>
 /* Layout: terenska mizа — 3D zemljevid sektorja levo, operativna plošča desno, trak s stanjem zgoraj; naloge posadke se odprejo kot kartice čez zemljevid. Enoten nočni videz. */
 /* Vojaške barvne teme: olivna (privzeta), puščavska, zimska, nočno gledanje. Vsaka redefinira iste žetone. */
@@ -269,6 +270,8 @@ table.spell td{text-align:left;font-weight:500;font-size:12px}
 .mapro .warn{font-size:12px}
 .symimg{width:58px;height:58px;margin:-6px 0;vertical-align:middle;display:block}.tlist dt:has(.symimg){background:none;padding:0;align-self:center}
 .mapcfg{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:6px;padding:12px}.mapcfg h3{margin:0}
+.claim{display:flex;gap:14px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--panel-2)}.claim-qr svg{display:block;border-radius:4px;width:132px;height:132px}.claim-code{font:700 22px var(--f-mono);letter-spacing:.1em;color:var(--fg)}.claim p{margin:4px 0 0}
+.codeinp{text-transform:uppercase;font-family:var(--f-mono);letter-spacing:.08em}.good{color:var(--good)}
 .hctl{display:flex;align-items:center;gap:8px}.hctl span{flex:1;font:11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.hctl b{min-width:48px;text-align:center;font-family:var(--f-mono);font-size:16px;color:var(--fg)}.hctl .btn{min-width:40px;padding:4px 0;font-size:18px}.hnote{margin:0;font-size:12px;color:var(--muted)}
 .mro-t{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
 @media (min-width:881px){.mapro{display:none!important}}
@@ -1660,11 +1663,38 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 const today=()=>{try{return new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Ljubljana'})}catch(e){return new Date().toISOString().slice(0,10)}};
 const MODE_LABEL={full:'Polna igra',quick:'Hitra igra',all:'Vse'};
 let DB=null,USER=null,UID=null,IS_OWNER=false,boardMode='all',lastMe=null;
-(async()=>{try{if(window.claude&&typeof window.claude.use==='function'){USER=await window.claude.use('user');DB=await window.claude.use('db');if(USER){UID=await USER.id();IS_OWNER=!!(await USER.isOwner())}if(!UID)DB=null;fillBoard(lastMe);renderOwnerSlot();loadMapCfg()}}catch(e){DB=null}})();
-async function personKey(){const c=game.contact||{},base=c.noContact||(!c.email&&!c.phone)?'n:'+(game.name||'').trim().toLowerCase():c.email?'e:'+c.email.trim().toLowerCase():'p:'+c.phone.replace(/\D/g,'');
+(async()=>{try{if(window.claude&&typeof window.claude.use==='function'){USER=await window.claude.use('user');DB=await window.claude.use('db');if(USER){UID=await USER.id();IS_OWNER=!!(await USER.isOwner())}if(!UID)DB=null;fillBoard(lastMe);renderOwnerSlot();loadMapCfg();await loadGameCfg();const pv=normCode(hashParam('potrdilo'));if(pv&&game.phase==='title'){showVerify(pv)}else if(game.phase==='title'&&$('#cardInfo'))refreshCardInfo()}}catch(e){DB=null}})();
+/* ---------- kartice in potrdila za nagradno igro ---------- */
+let GAMECFG={cardsRequired:false,maxTries:3};
+const CARD_ABC='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const newCode=()=>{const a=new Uint8Array(8);crypto.getRandomValues(a);const s=[...a].map(b=>CARD_ABC[b%CARD_ABC.length]).join('');return s.slice(0,4)+'-'+s.slice(4)};
+const normCode=v=>{const t=String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/O/g,'0').replace(/I/g,'1').replace(/L/g,'1');return t.length===8?t.slice(0,4)+'-'+t.slice(4):null};
+const okCode=c=>!!c&&/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c)&&[...c.replace('-','')].every(ch=>CARD_ABC.includes(ch));
+function hashParam(k){const m=location.hash.match(new RegExp('[#&]'+k+'=([^&]+)'));return m?decodeURIComponent(m[1]):null}
+function clearHash(){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){location.hash=''}}
+async function loadGameCfg(){if(!DB)return;try{const g=await DB.doc('config/game').get();const d=g.exists?g.data()||{}:{};GAMECFG={cardsRequired:!!d.cardsRequired,maxTries:Number.isFinite(+d.maxTries)?+d.maxTries:3}}catch(e){}}
+async function cardExists(code){if(!DB)return null;try{return(await DB.doc('cards/'+code).get()).exists}catch(e){return null}}
+const qrSVG=(t,size)=>window.QR?window.QR.svg(t,{size,ecl:'M'}):'';
+const verifyURL=code=>location.origin+location.pathname+'#potrdilo='+code;
+// rezultati današnjega dne za kodo (kartica ali osebna koda) z mestom v nagradni igri
+async function codeResults(code){if(!DB)return null;let rows;try{const q=await DB.collection('scores').where('day','==',today()).get();rows=q.docs.map(d=>({...d.data(),id:d.id}))}catch(e){return null}
+  const out=[];for(const mode of ['full','quick']){const mine=rows.filter(r=>(r.mode||'full')===mode&&(r.card===code||r.claim===code));if(!mine.length)continue;
+    const best=bestPer(rows.filter(r=>(r.mode||'full')===mode)),prizeList=best.filter(r=>r.prize===true),me=best.find(r=>r.card===code||r.claim===code)||mine.sort((a,b)=>b.score-a.score)[0];
+    const rank=prizeList.findIndex(r=>r.card===code||r.claim===code);out.push({mode,name:me.name,score:me.score,prize:me.prize===true,rank:rank>=0?rank+1:null,tries:mine.length,over:mine.some(r=>r.over)})}
+  return out}
+function resultsHTML(code,res){if(res===null)return'<p class="warn">Rezultatov ni bilo mogoče naložiti.</p>';if(!res.length)return`<p class="muted">Koda <b>${esc(code)}</b> danes še nima rezultata.</p>`;
+  return`<div class="tblwrap"><table class="lb"><thead><tr><th>Način</th><th>Ime</th><th>Točke</th><th>Mesto v nagradni igri</th><th>Poskusi</th></tr></thead><tbody>${res.map(r=>`<tr class="${r.rank&&r.rank<=3?'me':''}"><td>${MODE_LABEL[r.mode]}</td><td>${esc(r.name)}</td><td>${r.score}</td><td>${r.prize?(r.rank?`<b>${r.rank}.</b>${r.rank<=3?' · nagrada':''}`:'—'):'ne sodeluje'}</td><td>${r.tries}${r.over?' · porabljeni':''}</td></tr>`).join('')}</tbody></table></div>`}
+async function showVerify(code){const card=modal(`<div class="hd"><div class="eyebrow">Nagradna igra · potrdilo</div><h2>Koda ${esc(code)}</h2><p class="lede">Rezultati te kode za danes. Nagrado prejmejo prvi trije v vsakem načinu, ki sodelujejo v nagradni igri.</p></div><div id="vbox"><p class="muted">Nalagam …</p></div><div class="btnrow"><button class="btn primary" id="vclose">Na začetni zaslon</button></div>`);
+  $('#vclose',card).onclick=()=>{clearHash();closeModal();titleScreen()};$('#vbox',card).innerHTML=resultsHTML(code,await codeResults(code))}
+function claimHTML(code,isCard){return`<div class="claim"><div class="claim-qr">${qrSVG(verifyURL(code),132)}</div><div><div class="eyebrow">${isCard?'Tvoja kartica':'Tvoja osebna koda'}</div><div class="claim-code">${esc(code)}</div><p class="muted small">${isCard?'Kartico shrani in jo pokaži ob podelitvi nagrad.':'Fotografiraj to kodo in jo pokaži ob podelitvi nagrad.'} Organizator jo skenira in vidi tvoj rezultat in mesto.</p></div></div>`}
+// tiskanje kartic (8 na stran A4)
+function printCards(codes,base,w){w=w||window.open('','_blank');if(!w){toast('Brskalnik je blokiral novo okno. Dovoli pojavna okna za to stran.');return}
+  const cells=codes.map(c=>`<div class="c"><div class="t">ENOTA ZA ZVEZE</div><div class="s">nagradna igra</div>${qrSVG(base.replace(/\/+$/,'')+'/#k='+c,170)}<div class="k">${c}</div><div class="i">Poveži se na Wi-Fi in skeniraj kodo s kamero telefona. Kartico shrani do podelitve nagrad.</div></div>`).join('');
+  w.document.open();w.document.write(`<!doctype html><html lang="sl"><head><meta charset="utf-8"><title>Kartice · Enota za zveze</title><style>@page{size:A4;margin:10mm}body{margin:0;font:12px system-ui,sans-serif;color:#111}.g{display:grid;grid-template-columns:1fr 1fr;gap:0}.c{height:68mm;border:1px dashed #999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4mm;box-sizing:border-box;break-inside:avoid}.t{font-weight:800;letter-spacing:.12em}.s{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.1em}.k{font:700 18px ui-monospace,monospace;letter-spacing:.12em}.i{font-size:9.5px;color:#444;text-align:center;max-width:62mm}svg{width:40mm;height:40mm}.bar{padding:10px;font:14px system-ui}@media print{.bar{display:none}}</style></head><body><div class="bar">${codes.length} kartic · naslov igre: ${esc(base)} · <button onclick="print()">Natisni</button></div><div class="g">${cells}</div></body></html>`);w.document.close()}
+async function personKey(){const c=game.contact||{},base=game.card?'k:'+game.card:c.noContact||(!c.email&&!c.phone)?'n:'+(game.name||'').trim().toLowerCase():c.email?'e:'+c.email.trim().toLowerCase():'p:'+c.phone.replace(/\D/g,'');
   try{const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('linija-zveze:'+base));return[...new Uint8Array(buf)].slice(0,12).map(b=>b.toString(16).padStart(2,'0')).join('')}
   catch(e){let h=2166136261;for(const ch of base){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return'f'+(h>>>0).toString(16)}}
-function bestPer(rows){const m=new Map();for(const r of rows){const k=(r.pk||r.id)+'|'+(r.mode||'full'),cur=m.get(k);if(!cur)m.set(k,{...r,tries:1});else{cur.tries++;if(r.score>cur.score)m.set(k,{...r,tries:cur.tries})}}return[...m.values()].sort((a,b)=>b.score-a.score)}
+function bestPer(rows){const m=new Map(),better=(r,c)=>(r.prize===true)!==(c.prize===true)?r.prize===true:r.score>c.score;for(const r of rows){const k=(r.pk||r.id)+'|'+(r.mode||'full'),cur=m.get(k);if(!cur)m.set(k,{...r,tries:1});else{cur.tries++;if(better(r,cur))m.set(k,{...r,tries:cur.tries})}}return[...m.values()].sort((a,b)=>b.score-a.score)}
 function lbTable(rows,meId){if(!rows.length)return'<p class="muted">Danes še ni rezultatov. Bodi prvi!</p>';
   const cnt={},medal=r=>{if(r.prize!==true)return'';const m=r.mode||'full';cnt[m]=(cnt[m]||0)+1;return cnt[m]<=3?`<span class="medal m${cnt[m]}" title="${['','Zlata','Srebrna','Bronasta'][cnt[m]]} medalja · ${MODE_LABEL[m]}" aria-label="${['','Zlata','Srebrna','Bronasta'][cnt[m]]} medalja">${cnt[m]}</span>`:''};
   const md=rows.map(medal);
@@ -1677,10 +1707,11 @@ async function fillBoard(meId){lastMe=meId||null;if(!$('#lbBox'))return;let rows
   if(mode!=='all')rows=rows.filter(r=>(r.mode||'full')===mode);
   rows=bestPer(rows);const box=$('#lbBox');if(!box||mode!==boardMode)return;
   box.innerHTML=lbTable(rows,meId)+`<p class="muted small">${shared?'Skupna lestvica današnjega dne, en (najboljši) rezultat na osebo v vsakem načinu. Medalje označujejo najboljše tri v vsakem načinu, ki sodelujejo v nagradni igri.':'Lestvica je shranjena samo na tej napravi.'}</p>`}
-async function saveRun(run){run.pk=await personKey();run.prize=!(game.contact&&game.contact.noContact);const list=lbLoad();list.push(run);lbSave(list.slice(-300));if(!DB)return false;
-  try{await DB.collection('scores').doc(run.id).set({name:run.name,score:run.score,won:run.won,day:run.day,at:run.at,uid:UID,final:pct(run.final),mode:run.mode,pk:run.pk,prize:run.prize});
+async function saveRun(run){run.pk=await personKey();run.card=game.card||null;run.claim=game.card?null:game.claim||null;run.prize=game.card?true:GAMECFG.cardsRequired?false:!(game.contact&&game.contact.noContact);const list=lbLoad();list.push(run);lbSave(list.slice(-300));if(!DB)return false;
+  try{await DB.collection('scores').doc(run.id).set({name:run.name,score:run.score,won:run.won,day:run.day,at:run.at,uid:UID,final:pct(run.final),mode:run.mode,pk:run.pk,prize:run.prize,...(run.card?{card:run.card}:run.claim?{claim:run.claim}:{})});
+    try{const g=await DB.doc('scores/'+run.id).get();if(g.exists){const d=g.data();run.prize=d.prize;run.over=!!d.over;lbSave(lbLoad().map(x=>x.id===run.id?{...x,prize:d.prize}:x))}}catch(e){}
     await DB.doc(`contacts/${UID}`).set({at:run.at});
-    await DB.doc(`contacts/${UID}/runs/${run.id}`).set({name:run.name,phone:game.contact.phone||'',email:game.contact.email||'',noContact:!!game.contact.noContact,consent:!!game.contact.consent,score:run.score,mode:run.mode,day:run.day,at:run.at});return true}catch(e){return false}}
+    await DB.doc(`contacts/${UID}/runs/${run.id}`).set({name:run.name,card:run.card||'',claim:run.claim||'',phone:game.contact.phone||'',email:game.contact.email||'',noContact:!!game.contact.noContact,consent:!!game.contact.consent,score:run.score,mode:run.mode,day:run.day,at:run.at});return true}catch(e){return false}}
 async function saveFeedback(fb){try{const l=JSON.parse(localStorage.getItem('linija-zveze-fb')||'[]');l.push(fb);localStorage.setItem('linija-zveze-fb',JSON.stringify(l.slice(-100)))}catch(e){}
   if(!DB)return false;try{await DB.doc(`feedback/${UID}`).set({at:fb.at});await DB.doc(`feedback/${UID}/items/${fb.id}`).set(fb);return true}catch(e){return false}}
 function victory(){game.phase='victory';const total=totalSoFar(),fin=S&&S.final!=null?S.final:1,won=fin>=.5,day=today(),mode=game.mode||'full';
@@ -1688,18 +1719,19 @@ function victory(){game.phase='victory';const total=totalSoFar(),fin=S&&S.final!
   const c=modal(`<div class="title-hero"><div class="eyebrow">${MODE_LABEL[mode]} · ${won?'končana':'neuspešna'}</div><h1 style="${won?'':'color:var(--bad)'}">${won?'Zmaga':'Konec igre'}</h1><p class="lede">${won?`Enota Alfa ena je s tvojo pomočjo in zagretostjo uspela premagati sovražnika in zmagati. ${esc(run.name)}, tvoja poročila so bila natančna (${pct(fin)} % pravilnih podatkov).`:`Tvoja poročila v enoti Alfa ena niso bila dovolj natančna: pravilnih je bilo ${pct(fin)} % podatkov, potrebnih je vsaj 50 %. Brez točnih podatkov enota ni mogla nadaljevati napada.`}</p></div>
     <div class="score-big">${total}<small> točk</small></div>
     <ul class="rows">${game.results.map(r=>`<li><span>${mode==='quick'?'Hitra igra':`Misija ${r.m} · ${['Zaledje','Premik naprej','Preboj'][r.m-1]}`}</span><b>${r.total}</b></li>`).join('')}<li><span>Zaključna poročila</span><b>${pct(fin)} %</b></li></ul>
-    <p class="muted small" id="saveMsg">Shranjujem rezultat …</p>
+    <p class="muted small" id="saveMsg">Shranjujem rezultat …</p><div id="claimBox"></div>
     ${boardHTML('all')}
     <div class="fb"><div class="eyebrow">Povratne informacije</div><p class="lede">Kako ti je bila igra všeč? Kaj bi izboljšal?</p><div class="stars" role="radiogroup" aria-label="Ocena">${[1,2,3,4,5].map(n=>`<button class="star" data-r="${n}" aria-label="${n} od 5">★</button>`).join('')}</div><textarea id="fbText" rows="3" maxlength="1000" placeholder="Tvoje mnenje, predlogi, napake …"></textarea><div class="btnrow"><button class="btn" id="fbSend">Pošlji povratne informacije</button></div><p class="muted small" id="fbMsg"></p></div>
     <div class="btnrow"><button class="btn primary" id="next">Naslednji igralec</button><button class="btn" id="again">Poskusi znova (isti igralec)</button></div>`);
-  saveRun(run).then(ok=>{const m=$('#saveMsg');if(m)m.textContent=ok?'Rezultat je shranjen na skupni lestvici.':'Rezultat je shranjen samo na tej napravi.';fillBoard(run.id)});
+  saveRun(run).then(ok=>{const m=$('#saveMsg');if(m)m.textContent=ok?(run.over?`Rezultat je na skupni lestvici, a ne šteje za nagrado: kartica je porabila vse štete poskuse (${GAMECFG.maxTries}).`:run.prize?'Rezultat je shranjen na skupni lestvici in sodeluje v nagradni igri.':'Rezultat je shranjen na skupni lestvici, v nagradni igri ne sodeluje.'):'Rezultat je shranjen samo na tej napravi.';
+    const cb=$('#claimBox'),code=run.card||run.claim;if(cb&&ok&&code&&(run.prize||run.card))cb.innerHTML=claimHTML(code,!!run.card);fillBoard(run.id)});
   let rating=0;c.querySelectorAll('.star').forEach(b=>b.onclick=()=>{rating=+b.dataset.r;c.querySelectorAll('.star').forEach(x=>x.classList.toggle('on',+x.dataset.r<=rating))});
   $('#fbSend',c).onclick=async()=>{const text=$('#fbText',c).value.trim();if(!rating&&!text){$('#fbMsg',c).textContent='Izberi oceno ali napiši mnenje.';return}
     $('#fbSend',c).disabled=true;const ok=await saveFeedback({id:run.id,name:run.name,rating,text,day,mode,at:Date.now(),score:total});
     const box=c.querySelector('.fb');if(box)box.innerHTML=`<div class="eyebrow">Povratne informacije</div><p class="lede">Hvala za povratne informacije!${ok?'':' Shranjene so na tej napravi.'}</p>`};
   const reset=()=>{game.mission=1;game.dmg=0;game.results=[];game.seedBase=Math.floor(Math.random()*1e9)};
   $('#again',c).onclick=()=>{closeModal();reset();startMission(1)};
-  $('#next',c).onclick=()=>{closeModal();reset();game.name='';game.contact=null;titleScreen()}}
+  $('#next',c).onclick=()=>{closeModal();reset();game.name='';game.contact=null;game.card=null;game.claim=null;clearHash();titleScreen()}}
 const validPhone=v=>v.replace(/[\s+\-/()]/g,'').length>=8&&/^[\d\s+\-/()]+$/.test(v);
 const validEmail=v=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
 function renderOwnerSlot(){const sl=$('#ownerSlot');if(!sl)return;sl.innerHTML=IS_OWNER&&DB?'<button class="btn sm" id="ownerBtn">Organizator</button>':'';const b=$('#ownerBtn');if(b)b.onclick=ownerGate}
@@ -1724,14 +1756,43 @@ async function ownerGate(){let doc=null;try{const g=await DB.doc('admin/pin').ge
     if(Date.now()<pinLockUntil)return err(`Preveč napačnih poskusov. Poskusi znova čez ${Math.ceil((pinLockUntil-Date.now())/1000)} s.`);
     if(await sha(doc.salt+':'+p)===doc.hash){pinFails=0;openOwner()}else{pinFails++;if(pinFails>=3){pinLockUntil=Date.now()+30000;pinFails=0;err('Napačen PIN. Plošča je zaklenjena za 30 sekund.')}else err('Napačen PIN.')}};
   $('#pinOk',card).onclick=ok;card.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter')ok()}))}
-async function openOwner(){const card=modal(`<div class="hd"><div class="eyebrow">Organizator · vidiš samo ti</div><h2>Nagradna igra</h2><div class="btnrow"><input type="date" id="odate" class="dateinp" value="${today()}" aria-label="Dan"><select id="omode" class="dateinp" aria-label="Način"><option value="full">Polna igra</option><option value="quick">Hitra igra</option></select><button class="btn sm" id="oload">Prikaži</button></div></div><section class="mapcfg" id="omap"></section><div id="obox"><p class="muted">Nalagam …</p></div><div id="oexp"></div><button class="btn" id="oclose">Zapri</button>`);
+async function renderCardsAdmin(root){const box=$('#ocards',root);if(!box)return;await loadGameCfg();
+  let list=[];try{const q=await DB.collection('cards').get();list=q.docs.map(d=>({...d.data(),id:d.id}))}catch(e){}
+  const batches={};list.sort((a,b)=>(a.at||0)-(b.at||0)).forEach(c=>{const b=c.batch||'—';(batches[b]=batches[b]||[]).push(c)});
+  const isLocal=/^(localhost|127\.|\[::1\])/.test(location.hostname);
+  box.innerHTML=`<h3>Kartice za nagradno igro</h3>
+    <label class="animrow" for="reqSw"><span class="switch"><input type="checkbox" id="reqSw" role="switch" ${GAMECFG.cardsRequired?'checked':''}><span class="knob"></span></span><span class="animtxt"><b>Nagradna igra samo s kartico</b><span>${GAMECFG.cardsRequired?'Vklopljeno: brez kartice se lahko igra, rezultat pa ne šteje za nagrado.':'Izklopljeno: kartica ni obvezna, brez nje igralec sodeluje s kontaktom.'}</span></span></label>
+    <div class="btnrow"><label class="muted small" for="maxT">Štetih poskusov na kartico</label><select id="maxT" class="dateinp">${[[1,'1'],[2,'2'],[3,'3'],[5,'5'],[0,'neomejeno']].map(([v,t])=>`<option value="${v}" ${GAMECFG.maxTries===v?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="btnrow"><input id="cardN" type="number" min="1" max="200" value="24" class="dateinp" style="width:84px" aria-label="Število kartic"><input id="cardBase" class="dateinp" style="flex:1;min-width:200px" value="${esc((()=>{try{return localStorage.getItem('ezz-card-base')}catch(e){return null}})()||location.origin)}" aria-label="Naslov igre na kartici"><button class="btn sm" id="cardMake">Ustvari in natisni kartice</button></div>
+    ${isLocal?'<p class="warn small">Naslova »localhost« telefoni ne morejo odpreti. Vpiši naslov, ki ga odprejo telefoni, npr. http://10.70.84.229:8080.</p>':'<p class="muted small">QR koda na kartici odpre igro na tem naslovu z že vpisano kodo.</p>'}
+    <p class="muted small">Ustvarjenih kartic: ${list.length}${list.length?`, uporabljenih: ${list.filter(c=>c.tries).length}`:''}.</p>
+    ${Object.keys(batches).length?`<div class="btnrow"><span class="muted small">Ponovno natisni serijo:</span>${Object.entries(batches).map(([b,a])=>`<button class="btn sm" data-batch="${esc(b)}">${esc(b)} · ${a.length}</button>`).join('')}</div>`:''}
+    <div class="btnrow"><input id="vcode" class="dateinp codeinp" placeholder="npr. K7Q2-M9XF" maxlength="9" aria-label="Koda kartice ali potrdila"><button class="btn sm" id="vgo">Preveri kodo</button></div><div id="vres"></div><p class="muted small" id="cardMsg"></p>`;
+  const msg=$('#cardMsg',box),save=async d=>{try{const nd={...GAMECFG,...d};await DB.doc('config/game').set({...nd,at:Date.now()});GAMECFG=nd;renderCardsAdmin(root)}catch(e){msg.textContent='Nastavitve ni bilo mogoče shraniti.'}};
+  $('#reqSw',box).onchange=e=>save({cardsRequired:e.target.checked});$('#maxT',box).onchange=e=>save({maxTries:+e.target.value});
+  $('#cardMake',box).onclick=async e=>{const n=clamp(Math.round(+$('#cardN',box).value||0),1,200),base=$('#cardBase',box).value.trim();
+    if(!/^https?:\/\/[^\s]+$/.test(base)){msg.textContent='Naslov igre se mora začeti s http:// ali https://';return}
+    try{localStorage.setItem('ezz-card-base',base)}catch(_){}
+    const w=window.open('','_blank');if(!w){msg.textContent='Brskalnik je blokiral novo okno. Dovoli pojavna okna za to stran in poskusi znova.';return}
+    w.document.write('<p style="font:14px system-ui;padding:16px">Ustvarjam kartice …</p>');
+    e.target.disabled=true;msg.textContent='Ustvarjam kartice …';
+    const batch=new Date().toLocaleString('sl-SI',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}),have=new Set(list.map(c=>c.id)),codes=[];
+    while(codes.length<n){const c=newCode();if(!have.has(c)&&!codes.includes(c))codes.push(c)}
+    try{for(let i=0;i<codes.length;i+=10)await Promise.all(codes.slice(i,i+10).map(c=>DB.doc('cards/'+c).set({at:Date.now(),batch,base,tries:0})));printCards(codes,base,w);msg.textContent=`Ustvarjenih ${codes.length} kartic.`}
+    catch(err){try{w.close()}catch(_){}msg.textContent='Kartic ni bilo mogoče shraniti.'}
+    e.target.disabled=false;setTimeout(()=>renderCardsAdmin(root),500)};
+  box.querySelectorAll('[data-batch]').forEach(b=>b.onclick=()=>{const a=batches[b.dataset.batch];printCards(a.map(c=>c.id),a[0].base||$('#cardBase',box).value.trim())});
+  const vgo=async()=>{const c=normCode($('#vcode',box).value),out=$('#vres',box);if(!okCode(c)){out.innerHTML='<p class="warn">Koda ima 8 znakov, npr. K7Q2-M9XF.</p>';return}
+    out.innerHTML='<p class="muted">Nalagam …</p>';const ex=await cardExists(c);out.innerHTML=`<p class="muted small">${ex?'Kartica obstaja.':'To ni kartica, preverjam osebno kodo.'}</p>`+resultsHTML(c,await codeResults(c))};
+  $('#vgo',box).onclick=vgo;$('#vcode',box).onkeydown=e=>{if(e.key==='Enter')vgo()}}
+async function openOwner(){const card=modal(`<div class="hd"><div class="eyebrow">Organizator · vidiš samo ti</div><h2>Nagradna igra</h2><div class="btnrow"><input type="date" id="odate" class="dateinp" value="${today()}" aria-label="Dan"><select id="omode" class="dateinp" aria-label="Način"><option value="full">Polna igra</option><option value="quick">Hitra igra</option></select><button class="btn sm" id="oload">Prikaži</button></div></div><section class="mapcfg" id="omap"></section><section class="mapcfg" id="ocards"></section><div id="obox"><p class="muted">Nalagam …</p></div><div id="oexp"></div><button class="btn" id="oclose">Zapri</button>`);
   const renderMapCfg=async()=>{await loadMapCfg();const box=$('#omap',card);if(!box)return;
     box.innerHTML=`<h3>Zemljevidi</h3><label class="animrow" for="dynSw"><span class="switch"><input type="checkbox" id="dynSw" role="switch" ${MAPCFG.dynamic?'checked':''}><span class="knob"></span></span><span class="animtxt"><b>Dinamično generirani zemljevidi</b><span>${MAPCFG.dynamic?'Vklopljeno: vsak igralec dobi drugačen zemljevid.':'Izklopljeno: vsi igralci dobijo iste zemljevide (pošteno za nagradno igro).'}</span></span></label>
       <div class="btnrow"><button class="btn sm" id="shuf" ${MAPCFG.dynamic?'disabled':''}>Premešaj zemljevide</button><span class="muted small">${MAPCFG.dynamic?'Ob vklopljenem dinamičnem načinu mešanje ni potrebno.':`Trenutna varianta: <b>#${MAPCFG.variant}</b>${MAPCFG.at?' · nastavljena '+new Date(MAPCFG.at).toLocaleString('sl-SI'):''}`}</span></div><p class="muted small" id="mapMsg"></p>`;
     const save=async d=>{const msg=$('#mapMsg',card);try{await DB.doc('config/maps').set({...d,at:Date.now()});MAPCFG={...d,at:Date.now()};msg.textContent='Shranjeno. Velja za vse naslednje igre na vseh napravah.';setTimeout(renderMapCfg,900)}catch(e){msg.textContent='Nastavitve ni bilo mogoče shraniti.'}};
     $('#dynSw',card).onchange=e=>save({dynamic:e.target.checked,variant:MAPCFG.variant});
     $('#shuf',card).onclick=()=>{let v;do{v=1+Math.floor(Math.random()*99999)}while(v===MAPCFG.variant);save({dynamic:false,variant:v})}};
-  renderMapCfg();
+  renderMapCfg();renderCardsAdmin(card);
   let cache=null;
   const load=async()=>{const d=$('#odate',card).value||today(),mode=$('#omode',card).value,box=$('#obox',card);box.innerHTML='<p class="muted">Nalagam …</p>';$('#oexp',card).innerHTML='';
     try{const q=await DB.collection('scores').where('day','==',d).orderBy('score','desc').limit(500).get();const all=q.docs.map(x=>({...x.data(),id:x.id}));
@@ -1740,10 +1801,10 @@ async function openOwner(){const card=modal(`<div class="hd"><div class="eyebrow
       let fb=[];try{const us=await DB.collection('feedback').get();for(const u of us.docs){const it=await DB.collection(`feedback/${u.id}/items`).get();it.docs.forEach(x=>fb.push(x.data()))}}catch(e){}
       fb=fb.filter(x=>x.day===d).sort((a,b)=>b.at-a.at);cache={d,mode,rows,fb,all};
       const ctTxt=ct=>ct?(ct.noContact?'ne želi kontakta':esc([ct.phone,ct.email].filter(Boolean).join(' · '))||'—'):'izbrisan';
-      box.innerHTML=`<h3>Rezultati · ${d} · ${MODE_LABEL[mode]}</h3>${rows.length?`<div class="tblwrap"><table class="lb"><thead><tr><th>#</th><th>Ime</th><th>Kontakt</th><th>Poskusi</th><th>Točke</th><th></th></tr></thead><tbody>${rows.map(({r,ct,i})=>`<tr class="${i<3?'me':''}"><td>${i+1}</td><td>${esc(r.name)}</td><td>${ctTxt(ct)}</td><td>${r.tries}</td><td>${r.score}</td><td><button class="btn sm" data-ed="${i}">Uredi</button></td></tr>`).join('')}</tbody></table></div><p class="muted small">Upošteva se najboljši rezultat vsake osebe. Prvi trije so označeni.</p>`:'<p class="muted">Ta dan ni rezultatov v tem načinu.</p>'}
+      box.innerHTML=`<h3>Rezultati · ${d} · ${MODE_LABEL[mode]}</h3>${rows.length?`<div class="tblwrap"><table class="lb"><thead><tr><th>#</th><th>Ime</th><th>Kartica</th><th>Kontakt</th><th>Poskusi</th><th>Točke</th><th></th></tr></thead><tbody>${rows.map(({r,ct,i})=>`<tr class="${i<3?'me':''}"><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.card||r.claim||'')}</td><td>${ctTxt(ct)}</td><td>${r.tries}</td><td>${r.score}</td><td><button class="btn sm" data-ed="${i}">Uredi</button></td></tr>`).join('')}</tbody></table></div><p class="muted small">Upošteva se najboljši rezultat vsake osebe. Prvi trije so označeni.</p>`:'<p class="muted">Ta dan ni rezultatov v tem načinu.</p>'}
       <div class="btnrow"><button class="btn sm" id="csvR">Izvozi rezultate (CSV)</button><button class="btn sm" id="csvF">Izvozi povratne informacije (CSV)</button><button class="btn sm danger" id="delC">Izbriši kontakte tega dne</button></div><div id="oedit"></div><div class="btnrow"><button class="btn sm danger" id="resetDay">Izbriši rezultate tega dne</button><button class="btn sm danger" id="resetAll">Ponastavi celotno lestvico</button></div>
       <h3>Povratne informacije · ${fb.length}</h3>${fb.length?`<div class="qres">${fb.map(f=>`<div><b>${esc(f.name||'')} · ${'★'.repeat(f.rating||0)}${'☆'.repeat(5-(f.rating||0))}</b><p>${esc(f.text||'')}</p></div>`).join('')}</div>`:'<p class="muted">Ta dan ni povratnih informacij.</p>'}`;
-      $('#csvR',card).onclick=()=>offerFile(`linija-zveze-rezultati-${d}-${mode}.csv`,toCSV([['Mesto','Ime','Točke','Izid','Poskusi','Telefon','E-pošta','Ne želi kontakta','Privolitev']].concat(rows.map(({r,ct,i})=>[i+1,r.name,r.score,r.won?'Zmaga':'Konec igre',r.tries,ct?ct.phone:'',ct?ct.email:'',ct&&ct.noContact?'da':'',ct&&ct.consent?'da':'']))),$('#oexp',card));
+      $('#csvR',card).onclick=()=>offerFile(`linija-zveze-rezultati-${d}-${mode}.csv`,toCSV([['Mesto','Ime','Koda','Točke','Izid','Poskusi','Telefon','E-pošta','Ne želi kontakta','Privolitev']].concat(rows.map(({r,ct,i})=>[i+1,r.name,r.card||r.claim||'',r.score,r.won?'Zmaga':'Konec igre',r.tries,ct?ct.phone:'',ct?ct.email:'',ct&&ct.noContact?'da':'',ct&&ct.consent?'da':'']))),$('#oexp',card));
       $('#csvF',card).onclick=()=>offerFile(`linija-zveze-mnenja-${d}.csv`,toCSV([['Ime','Ocena','Mnenje','Točke','Način']].concat(fb.map(f=>[f.name,f.rating||'',f.text||'',f.score||'',MODE_LABEL[f.mode||'full']]))),$('#oexp',card));
       const del=$('#delC',card);del.onclick=async()=>{if(del.dataset.armed!=='1'){del.dataset.armed='1';del.textContent='Potrdi izbris vseh kontaktov tega dne';return}
         del.disabled=true;del.textContent='Brišem …';let n=0;for(const r of cache.all){if(!r.uid)continue;try{await DB.doc(`contacts/${r.uid}/runs/${r.id}`).delete();n++}catch(e){}}toast(`Izbrisanih kontaktov: ${n}.`);load()};
@@ -1762,10 +1823,11 @@ async function openOwner(){const card=modal(`<div class="hd"><div class="eyebrow
             toast('Vnos shranjen.');load()}catch(err){fail('Shranjevanje ni uspelo.')}}})}
     catch(e){box.innerHTML='<p class="warn">Podatkov ni bilo mogoče naložiti.</p>'}};
   $('#oload',card).onclick=load;$('#oclose',card).onclick=()=>{closeModal();titleScreen()};load()}
-function titleScreen(){game.phase='title';S=null;game.mission=1;if(!MAPCFG.dynamic)game.seedBase=mapSeed();setTimeout(loadMapCfg,0);W=genWorld(1,0,game.seedBase+7919);BASE=renderBase();buildWorld3D();resetView();renderPanel();updateHUD();const ct=game.contact||{};
+function titleScreen(){game.phase='title';S=null;game.mission=1;{const hk=normCode(hashParam('k'));if(hk)game.card=hk}if(!MAPCFG.dynamic)game.seedBase=mapSeed();setTimeout(loadMapCfg,0);W=genWorld(1,0,game.seedBase+7919);BASE=renderBase();buildWorld3D();resetView();renderPanel();updateHUD();const ct=game.contact||{};
   const c=modal(`<div class="title-hero"><div class="eyebrow">Vojaške zveze · terenska simulacija · nagradna igra</div><h1>Enota za <span>zveze</span></h1><p class="lede">Vodiš enoto za zveze s klicnim znakom Maribor-7-4. Postavi poveljniško mesto, radijsko relejno postajo, končno radijsko postajo in IT tovornjak tako, da so zveze s TOC (Triglav-7-2) in enoto Alfa ena močne, sovražnik pa te ne vidi. Nato dviguj stolpe, usmerjaj antene, vodi radijski promet in ohrani omrežje.</p></div>
     <div class="how"><div><b>Polna igra · ~40 min</b>Tri misije po dva dni: postavitev, dnevni pregledi, sovražni vdor in zaključna poročila v enoti Alfa ena.</div><div><b>Hitra igra · ~15 min</b>En dan: postavitev, en dnevni pregled z radijskim prometom in zaključna poročila. Ima svojo lestvico.</div><div><b>Nagrade</b>Najboljši trije rezultati dneva v vsakem načinu prejmejo nagrado. Šteje najboljši rezultat vsake osebe.</div></div>
     <div class="field"><label for="callsign">Ime in priimek ali vzdevek (prikazano na lestvici)</label><input id="callsign" maxlength="24" autocomplete="off" value="${esc(game.name||'')}" placeholder="npr. Janez Novak"></div>
+    <div class="field"><label for="cardcode">Koda kartice (če jo imaš)</label><input id="cardcode" class="codeinp" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(game.card||'')}" placeholder="npr. K7Q2-M9XF"><p class="muted small" id="cardInfo"></p></div>
     <div class="contact"><div class="field"><label for="phone">Telefon</label><input id="phone" type="tel" autocomplete="off" value="${esc(ct.phone||'')}" placeholder="npr. 041 123 456"></div><div class="field"><label for="email">E-pošta</label><input id="email" type="email" autocomplete="off" value="${esc(ct.email||'')}" placeholder="ime@primer.si"></div></div>
     <label class="check"><input type="checkbox" id="consent" ${ct.consent?'checked':''}> Strinjam se, da organizator moj telefon ali e-pošto uporabi samo za obvestilo o nagradi. Podatki se po podelitvi nagrad izbrišejo.</label>
     <label class="check"><input type="checkbox" id="nocontact" ${ct.noContact?'checked':''}> Ne želim, da me kontaktirate (v tem primeru ne morem prejeti nagrade)</label>
@@ -1776,18 +1838,34 @@ function titleScreen(){game.phase='title';S=null;game.mission=1;if(!MAPCFG.dynam
     ${animPickHTML()}
     <button class="btn sm lbtoggle" id="lbTog">Lestvica danes</button><div class="lbwrap">${boardHTML()}</div>`,'titlecard');
   const nc=$('#nocontact',c),ph=$('#phone',c),em=$('#email',c),cs=$('#consent',c),sync=()=>{ph.disabled=em.disabled=cs.disabled=nc.checked};nc.onchange=sync;sync();
+  const cc=$('#cardcode',c);let ccT=null;cc.oninput=()=>{clearTimeout(ccT);delete c.dataset.nocard;ccT=setTimeout(refreshCardInfo,350)};refreshCardInfo();
   const read=()=>({name:($('#callsign',c).value||'').trim(),contact:{phone:nc.checked?'':ph.value.trim(),email:nc.checked?'':em.value.trim(),noContact:nc.checked,consent:!nc.checked&&cs.checked}});
-  const go=mode=>{const v=read(),err=$('#formErr',c);let msg='';
+  const go=async mode=>{const v=read(),err=$('#formErr',c);let msg='';err.hidden=true;
+    const raw=cc.value.trim(),code=raw?normCode(raw):null,free=!!code||GAMECFG.cardsRequired;
     if(!v.name)msg='Vpiši ime ali vzdevek.';
-    else if(!v.contact.noContact&&!v.contact.phone&&!v.contact.email)msg='Vpiši telefon ali e-pošto (vsaj enega) ali označi, da ne želiš, da te kontaktiramo.';
+    else if(raw&&!okCode(code))msg='Koda kartice ni pravilna. Ima 8 znakov, npr. K7Q2-M9XF.';
+    else if(code&&(await cardExists(code))===false)msg='Kartica s to kodo ne obstaja. Preveri kodo ali jo skeniraj znova.';
+    else if(!code&&GAMECFG.cardsRequired&&!c.dataset.nocard){c.dataset.nocard='1';msg='Brez kartice lahko igraš, a rezultat ne šteje za nagradno igro. Klikni še enkrat za igro brez nagrade.'}
+    else if(!free&&!v.contact.noContact&&!v.contact.phone&&!v.contact.email)msg='Vpiši telefon ali e-pošto (vsaj enega) ali označi, da ne želiš, da te kontaktiramo.';
     else if(v.contact.phone&&!validPhone(v.contact.phone))msg='Telefonska številka ni veljavna.';
     else if(v.contact.email&&!validEmail(v.contact.email))msg='E-poštni naslov ni veljaven.';
-    else if(!v.contact.noContact&&!v.contact.consent)msg='Za sodelovanje v nagradni igri potrdi privolitev za uporabo kontakta.';
+    else if(!v.contact.noContact&&(v.contact.phone||v.contact.email)&&!v.contact.consent)msg='Za sodelovanje v nagradni igri potrdi privolitev za uporabo kontakta.';
     if(msg){err.textContent=msg;err.hidden=false;return}
-    game.name=v.name;game.contact=v.contact;game.mode=mode;game.mission=1;game.dmg=0;game.results=[];closeModal();startMission(1)};
+    game.card=code||null;game.claim=code?null:(game.claim||newCode());game.name=v.name;game.contact=v.contact;game.mode=mode;game.mission=1;game.dmg=0;game.results=[];closeModal();startMission(1)};
   $('#start',c).onclick=()=>go('full');$('#startQ',c).onclick=()=>go('quick');
-  $('#tut',c).onclick=()=>{const v=read();game.name=v.name;game.contact=v.contact;openTutorial(()=>titleScreen())};
+  $('#tut',c).onclick=()=>{const v=read();game.name=v.name;game.contact=v.contact;game.card=normCode(cc.value)||game.card;openTutorial(()=>titleScreen())};
   $('#lbTog',c).onclick=()=>c.classList.toggle('showlb');renderOwnerSlot();fillBoard()}
+
+async function refreshCardInfo(){const el=$('#cardInfo'),inp=$('#cardcode');if(!el||!inp)return;const raw=inp.value.trim(),code=raw?normCode(raw):null;
+  if(!raw){el.textContent=GAMECFG.cardsRequired?'Za nagradno igro potrebuješ kartico s QR kodo. Brez nje lahko igraš za vajo.':'Kartica ni obvezna. S kartico ti ni treba vpisati kontakta, nagrado prevzameš s kartico.';el.className='muted small';return}
+  if(!okCode(code)){el.textContent='Koda ima 8 znakov, npr. K7Q2-M9XF.';el.className='muted small';return}
+  if(!DB){el.textContent='Kartice ni mogoče preveriti, ker strežnik ni dosegljiv.';el.className='warn small';return}
+  let d=null;try{const g=await DB.doc('cards/'+code).get();d=g.exists?g.data():false}catch(e){}
+  if(inp.value.trim()!==raw)return;
+  if(d===false){el.textContent='Kartica s to kodo ne obstaja.';el.className='warn small';return}
+  const t=d&&d.tries|0,mx=GAMECFG.maxTries,left=mx>0?Math.max(0,mx-t):null;
+  el.textContent=`Kartica ${code} je veljavna.`+(left===null?'':left>0?` Štetih poskusov še: ${left} od ${mx}.`:` Porabila je vse štete poskuse (${mx}), nadaljnje igre ne štejejo za nagrado.`)+(t?' Kontakt ni potreben.':' Kontakt ni potreben, nagrado prevzameš s kartico.');el.className=left===0?'warn small':'good small'}
+window.addEventListener('hashchange',()=>{if(game.phase!=='title')return;const pv=normCode(hashParam('potrdilo'));if(pv){showVerify(pv);return}const k=normCode(hashParam('k'));if(k){game.card=k;titleScreen()}});
 
 /* ---------- zaključni izziv: dodelitev Alfa ena ---------- */
 const SAL_ACT=['Kopljejo zaklone','Premikajo se v koloni','Postavljajo minomet'];
