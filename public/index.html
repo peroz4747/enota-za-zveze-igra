@@ -15,6 +15,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="/shim.js"></script>
 <script src="/qrcode.js"></script>
+<script src="scan.js"></script>
 <style>
 /* Layout: terenska mizа — 3D zemljevid sektorja levo, operativna plošča desno, trak s stanjem zgoraj; naloge posadke se odprejo kot kartice čez zemljevid. Enoten nočni videz. */
 /* Vojaške barvne teme: olivna (privzeta), puščavska, zimska, nočno gledanje. Vsaka redefinira iste žetone. */
@@ -272,6 +273,7 @@ table.spell td{text-align:left;font-weight:500;font-size:12px}
 .mapcfg{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:6px;padding:12px}.mapcfg h3{margin:0}
 .claim{display:flex;gap:14px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--panel-2)}.claim-qr svg{display:block;border-radius:4px;width:132px;height:132px}.claim-code{font:700 22px var(--f-mono);letter-spacing:.1em;color:var(--fg)}.claim p{margin:4px 0 8px}.claim-img{display:block;width:min(260px,100%);margin:10px auto 0;border-radius:6px;border:1px solid var(--line)}
 .locked{opacity:.75;cursor:not-allowed}
+.codeRow{display:flex;gap:8px}.codeRow input{flex:1;min-width:0}
 .codeinp{text-transform:uppercase;font-family:var(--f-mono);letter-spacing:.08em}.good{color:var(--good)}
 .hctl{display:flex;align-items:center;gap:8px}.hctl span{flex:1;font:11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.hctl b{min-width:48px;text-align:center;font-family:var(--f-mono);font-size:16px;color:var(--fg)}.hctl .btn{min-width:40px;padding:4px 0;font-size:18px}.hnote{margin:0;font-size:12px;color:var(--muted)}
 .mro-t{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
@@ -1817,7 +1819,7 @@ async function renderCardsAdmin(root){const box=$('#ocards',root);if(!box)return
     <div class="btnrow"><input id="cardN" type="number" min="1" max="200" value="24" class="dateinp" style="width:84px" aria-label="Število kartic"><button class="btn sm" id="cardMake">Ustvari in natisni kartice</button><span class="muted small">QR koda na kartici odpre igro na zgornjem naslovu z že vpisano kodo.</span></div>
     <p class="muted small">Ustvarjenih kartic: ${list.length}${list.length?`, uporabljenih: ${list.filter(c=>c.tries).length}`:''}.</p>
     ${Object.keys(batches).length?`<div class="btnrow"><span class="muted small">Ponovno natisni serijo:</span>${Object.entries(batches).map(([b,a])=>`<button class="btn sm" data-batch="${esc(b)}">${esc(b)} · ${a.length}</button>`).join('')}</div>`:''}
-    <div class="btnrow"><input id="vcode" class="dateinp codeinp" placeholder="npr. K7Q2-M9XF" maxlength="9" aria-label="Koda kartice ali potrdila"><button class="btn sm" id="vgo">Preveri kodo</button></div><div id="vres"></div><p class="muted small" id="cardMsg"></p>`;
+    <div class="btnrow"><input id="vcode" class="dateinp codeinp" placeholder="npr. K7Q2-M9XF" maxlength="9" aria-label="Koda kartice ali potrdila"><button class="btn sm" id="vgo">Preveri kodo</button><button class="btn sm" id="vscan">Skeniraj potrdilo</button></div><div id="vres"></div><p class="muted small" id="cardMsg"></p>`;
   const msg=$('#cardMsg',box),save=async d=>{try{const nd={...GAMECFG,...d};await DB.doc('config/game').set({...nd,at:Date.now()});GAMECFG=nd;renderCardsAdmin(root)}catch(e){msg.textContent='Nastavitve ni bilo mogoče shraniti.'}};
   const bw=()=>{$('#baseWarn',box).hidden=!/^https?:\/\/(localhost|127\.|\[::1\])/i.test($('#cardBase',box).value.trim())};$('#cardBase',box).oninput=bw;bw();
   $('#devReset',box).onclick=()=>{LS.del('ezz-claim');LS.del('ezz-claim-name');game.claim=null;clearHash();msg.textContent='Koda te naprave je ponastavljena. Naslednja igra dobi novo kodo.'};
@@ -1841,7 +1843,7 @@ $('#maxT',box).onchange=e=>save({maxTries:+e.target.value});
   box.querySelectorAll('[data-batch]').forEach(b=>b.onclick=()=>{const a=batches[b.dataset.batch];printCards(a.map(c=>c.id),a[0].base||$('#cardBase',box).value.trim())});
   const vgo=async()=>{const c=normCode($('#vcode',box).value),out=$('#vres',box);if(!okCode(c)){out.innerHTML='<p class="warn">Koda ima 8 znakov, npr. K7Q2-M9XF.</p>';return}
     out.innerHTML='<p class="muted">Nalagam …</p>';const ex=await cardExists(c);out.innerHTML=`<p class="muted small">${ex?'Kartica obstaja.':'To ni kartica, preverjam osebno kodo.'}</p>`+resultsHTML(c,await codeResults(c))};
-  $('#vgo',box).onclick=vgo;$('#vcode',box).onkeydown=e=>{if(e.key==='Enter')vgo()}}
+  $('#vgo',box).onclick=vgo;$('#vscan',box).onclick=()=>window.ezzScan&&window.ezzScan(code=>{$('#vcode',box).value=code;vgo()},{title:'Skeniraj potrdilo ali kartico',hint:'Usmeri kamero v QR potrdilo na telefonu igralca ali v kartico.'});$('#vcode',box).onkeydown=e=>{if(e.key==='Enter')vgo()}}
 async function openOwner(){const card=modal(`<div class="hd"><div class="eyebrow">Organizator · vidiš samo ti</div><h2>Nagradna igra</h2><div class="btnrow"><input type="date" id="odate" class="dateinp" value="${today()}" aria-label="Dan"><select id="omode" class="dateinp" aria-label="Način"><option value="full">Polna igra</option><option value="quick">Hitra igra</option></select><button class="btn sm" id="oload">Prikaži</button></div></div><section class="mapcfg" id="omap"></section><section class="mapcfg" id="ocards"></section><div id="obox"><p class="muted">Nalagam …</p></div><div id="oexp"></div><button class="btn" id="oclose">Zapri</button>`);
   const renderMapCfg=async()=>{await loadMapCfg();const box=$('#omap',card);if(!box)return;
     box.innerHTML=`<h3>Zemljevidi</h3><label class="animrow" for="dynSw"><span class="switch"><input type="checkbox" id="dynSw" role="switch" ${MAPCFG.dynamic?'checked':''}><span class="knob"></span></span><span class="animtxt"><b>Dinamično generirani zemljevidi</b><span>${MAPCFG.dynamic?'Vklopljeno: vsak igralec dobi drugačen zemljevid.':'Izklopljeno: vsi igralci dobijo iste zemljevide (pošteno za nagradno igro).'}</span></span></label>
@@ -1884,7 +1886,7 @@ function titleScreen(){game.phase='title';S=null;game.mission=1;{const hk=normCo
   const c=modal(`<div class="title-hero"><div class="eyebrow">Vojaške zveze · terenska simulacija · nagradna igra</div><h1>Enota za <span>zveze</span></h1><p class="lede">Vodiš enoto za zveze s klicnim znakom Maribor-7-4. Postavi poveljniško mesto, radijsko relejno postajo, končno radijsko postajo in IT tovornjak tako, da so zveze s TOC (Triglav-7-2) in enoto Alfa ena močne, sovražnik pa te ne vidi. Nato dviguj stolpe, usmerjaj antene, vodi radijski promet in ohrani omrežje.</p></div>
     <div class="how"><div><b>Polna igra · ~40 min</b>Tri misije po dva dni: postavitev, dnevni pregledi, sovražni vdor in zaključna poročila v enoti Alfa ena.</div><div><b>Hitra igra · ~15 min</b>En dan: postavitev, en dnevni pregled z radijskim prometom in zaključna poročila. Ima svojo lestvico.</div><div><b>Nagrade</b>Najboljši trije rezultati dneva v vsakem načinu prejmejo nagrado. Šteje najboljši rezultat vsake osebe.</div></div>
     <div class="field"><label for="callsign">Ime in priimek ali vzdevek (prikazano na lestvici)</label><input id="callsign" maxlength="24" autocomplete="off" value="${esc(game.name||'')}" placeholder="npr. Janez Novak"></div>
-    <div class="field"><label for="cardcode">Koda kartice (če jo imaš)</label><input id="cardcode" class="codeinp" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(game.card||'')}" placeholder="npr. K7Q2-M9XF"><p class="muted small" id="cardInfo"></p></div>
+    <div class="field"><label for="cardcode">Koda kartice (če jo imaš)</label><div class="codeRow"><input id="cardcode" class="codeinp" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(game.card||'')}" placeholder="npr. K7Q2-M9XF"><button class="btn sm" type="button" id="cardScan">Skeniraj</button></div><p class="muted small" id="cardInfo"></p></div>
     <div class="contact"><div class="field"><label for="phone">Telefon</label><input id="phone" type="tel" autocomplete="off" value="${esc(ct.phone||'')}" placeholder="npr. 041 123 456"></div><div class="field"><label for="email">E-pošta</label><input id="email" type="email" autocomplete="off" value="${esc(ct.email||'')}" placeholder="ime@primer.si"></div></div>
     <label class="check"><input type="checkbox" id="consent" ${ct.consent?'checked':''}> Strinjam se, da organizator moj telefon ali e-pošto uporabi samo za obvestilo o nagradi. Podatki se po podelitvi nagrad izbrišejo.</label>
     <label class="check" id="nocontactRow"><input type="checkbox" id="nocontact" ${ct.noContact?'checked':''}> Ne želim, da me kontaktirate (v tem primeru ne morem prejeti nagrade)</label>
@@ -1895,7 +1897,8 @@ function titleScreen(){game.phase='title';S=null;game.mission=1;{const hk=normCo
     ${animPickHTML()}
     <button class="btn sm lbtoggle" id="lbTog">Lestvica danes</button><div class="lbwrap">${boardHTML()}</div>`,'titlecard');
   const nc=$('#nocontact',c),ph=$('#phone',c),em=$('#email',c),cs=$('#consent',c),sync=()=>{ph.disabled=em.disabled=cs.disabled=nc.checked};nc.onchange=sync;sync();
-  const cc=$('#cardcode',c);if(game.card&&entryCard()===game.card){cc.readOnly=true;cc.classList.add('locked');cc.title='Kartica, s katero si vstopil v igro.'}let ccT=null;cc.oninput=()=>{clearTimeout(ccT);delete c.dataset.nocard;ccT=setTimeout(refreshCardInfo,350)};refreshCardInfo();
+  const cc=$('#cardcode',c);if(game.card&&entryCard()===game.card){cc.readOnly=true;cc.classList.add('locked');cc.title='Kartica, s katero si vstopil v igro.';$('#cardScan',c).hidden=true}let ccT=null;
+  $('#cardScan',c).onclick=()=>window.ezzScan&&window.ezzScan(code=>{cc.value=code;delete c.dataset.nocard;refreshCardInfo();toast('Kartica '+code+' prebrana.')},{title:'Skeniraj kartico'});cc.oninput=()=>{clearTimeout(ccT);delete c.dataset.nocard;ccT=setTimeout(refreshCardInfo,350)};refreshCardInfo();
   const read=()=>({name:($('#callsign',c).value||'').trim(),contact:{phone:nc.checked?'':ph.value.trim(),email:nc.checked?'':em.value.trim(),noContact:nc.checked,consent:!nc.checked&&cs.checked}});
   const go=async mode=>{const v=read(),err=$('#formErr',c);let msg='';err.hidden=true;
     const raw=cc.value.trim(),code=raw?normCode(raw):null,free=!!code||GAMECFG.mode!=='contact';

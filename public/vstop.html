@@ -17,6 +17,7 @@ p{margin:0;color:var(--muted)}
 .qr:before,.qr:after{content:'';position:absolute;width:18px;height:18px;border:3px solid var(--fg)}
 .qr:before{left:8px;top:8px}.qr:after{right:8px;bottom:8px}
 input{width:100%;font:600 20px ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;text-align:center;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:12px}
+button.sec{background:transparent;color:var(--fg);border:1px solid var(--line)}
 button{font:600 15px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;background:var(--accent);color:#1a160a;border:0;border-radius:4px;padding:12px;cursor:pointer}
 .err{color:var(--bad)}
 </style>
@@ -26,19 +27,22 @@ button{font:600 15px system-ui,sans-serif;text-transform:uppercase;letter-spacin
   <div class="eyebrow">Nagradna igra</div>
   <h1>Enota za zveze</h1>
   <div class="qr" aria-hidden="true"></div>
-  <p>Za vstop v igro skeniraj QR kodo s kamero telefona. Kodo dobiš pri organizatorju.</p>
+  <p>Za vstop v igro skeniraj QR kodo na svoji kartici. Kartico dobiš pri organizatorju.</p>
+  <button id="scan" type="button">Skeniraj kartico</button>
   <p class="err" id="err" hidden>Ta koda ni veljavna. Preveri jo ali skeniraj znova.</p>
   <label for="c" class="eyebrow" style="color:var(--muted)">ali vpiši kodo</label>
   <input id="c" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7Q2-M9XF">
-  <button id="go">Vstopi</button>
+  <button id="go" class="sec">Vstopi</button>
 </main>
+<script src="scan.js"></script>
 <script>
 (function(){
   var q=new URLSearchParams(location.search),inp=document.getElementById('c');
   if(q.get('vstop')||q.get('k'))document.getElementById('err').hidden=false;
   function go(){var t=inp.value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(t.length!==8){inp.focus();return}
     location.href=location.pathname+'?vstop='+t.slice(0,4)+'-'+t.slice(4)}
-  document.getElementById('go').onclick=go;inp.onkeydown=function(e){if(e.key==='Enter')go()};
+  document.getElementById('go').onclick=go;
+  document.getElementById('scan').onclick=function(){window.ezzScan(function(c){location.href=location.pathname+'?vstop='+c},{title:'Skeniraj kartico'})};inp.onkeydown=function(e){if(e.key==='Enter')go()};
 })();
 </script>
 </body>
