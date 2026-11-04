@@ -207,9 +207,7 @@ function name_taken($day, $name, $pk) {
 function norm_entry($v) { $t = preg_replace('/[^A-Z0-9]/', '', strtoupper((string)$v)); return strlen($t) === 8 ? substr($t, 0, 4) . '-' . substr($t, 4) : null; }
 function valid_entry($code) {
   if (!$code || !preg_match('/^[A-Z0-9]{4}-[A-Z0-9]{4}$/', $code)) return false;
-  if (get_doc('cards/' . $code) !== null) return true;
-  $e = get_doc('entry/' . $code);
-  return $e !== null && g($e, 'active', true) !== false;
+  return get_doc('cards/' . $code) !== null;
 }
 function entry_required() { $c = get_doc('config/game'); return $c && g($c, 'entryRequired'); }
 function cookie_path() { $d = str_replace('\\', '/', dirname(isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '/')); return rtrim($d, '/') . '/'; }

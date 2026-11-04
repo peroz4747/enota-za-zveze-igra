@@ -36,7 +36,8 @@ Prijava organizatorja
 Obvezna koda za vstop
 ---------------------
 V plošči organizatorja (razdelek Nagradna igra) lahko vklopiš "Obvezna koda za vstop".
-Takrat se igra odpre samo s QR kodo (koda dogodka na plakatu ali kartica).
+Takrat se igra odpre samo s kartico (QR koda ali ročni vnos kode).
+Kartica ostane shranjena na telefonu igralca, tudi po osvežitvi strani.
 Kdor pozna samo naslov strani, vidi samo "Za vstop v igro skeniraj QR kodo".
 Organizator vstopi brez kode, ko je prijavljen na admin.html (tudi na telefonu,
 s katerim skenira potrdila za nagrade).
