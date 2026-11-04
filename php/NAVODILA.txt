@@ -33,6 +33,14 @@ Prijava organizatorja
 2. Klikni "Odpri igro". Na začetnem zaslonu se pojavi gumb "Organizator".
 3. Ob prvem odprtju nastavi PIN.
 
+Obvezna koda za vstop
+---------------------
+V plošči organizatorja (razdelek Nagradna igra) lahko vklopiš "Obvezna koda za vstop".
+Takrat se igra odpre samo s QR kodo (koda dogodka na plakatu ali kartica).
+Kdor pozna samo naslov strani, vidi samo "Za vstop v igro skeniraj QR kodo".
+Organizator vstopi brez kode, ko je prijavljen na admin.html (tudi na telefonu,
+s katerim skenira potrdila za nagrade).
+
 Podatki
 -------
 - Rezultati, kontakti, kartice in nastavitve so v mapi data (vsak zapis v svoji

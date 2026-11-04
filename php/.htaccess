@@ -1,5 +1,5 @@
 # Enota za zveze (Apache). Na drugih strežnikih se ta datoteka ne upošteva, igra deluje tudi brez nje.
-DirectoryIndex index.html
+DirectoryIndex index.php
 Options -Indexes
 <FilesMatch "^(config\.php|NAVODILA\.txt)$">
   <IfModule mod_authz_core.c>

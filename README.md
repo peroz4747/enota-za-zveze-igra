@@ -58,6 +58,8 @@ Kartica deluje v vseh načinih: kdor jo ima, mu kontakta ni treba vpisati.
 
 **Kartice:** vpiši število in klikni *Ustvari in natisni kartice* (8 na A4). Serijo lahko pozneje natisneš znova.
 
+**Obvezna koda za vstop:** stikalo v razdelku *Nagradna igra*. Ko je vklopljeno, se igra odpre samo s QR kodo: s **kodo dogodka** (na plakatu, ustvariš in zamenjaš jo v plošči) ali s **kartico**. Kdor pozna samo naslov, vidi stran »Za vstop v igro skeniraj QR kodo«. Strežnik brez veljavne kode ne pošlje igre in ne shrani rezultata. Ko kodo dogodka zamenjaš, stara (tudi na natisnjenih plakatih) ne deluje več. Organizator vstopi brez kode, ko je prijavljen na `admin.html`, zato se za skeniranje potrdil prijavi tudi na telefonu, s katerim skenira. Deluje v Dockerju in na PHP gostovanju; na Netlify strežnik zavrne rezultate brez kode, sama stran pa ostane vidna.
+
 **Podelitev:** na koncu igre igralec dobi QR potrdilo s svojo kodo. Organizator ga skenira s kamero telefona ali kodo vpiše v *Preveri kodo* in vidi ime, točke, mesto v nagradni igri in število poskusov.
 
 ## Podatki in varnostne kopije

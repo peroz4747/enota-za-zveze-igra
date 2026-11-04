@@ -9,7 +9,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { handle } from '../lib/core.mjs';
+import { handle, entryGate } from '../lib/core.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -70,11 +70,16 @@ function indexHtml() {
   return (indexCache = Buffer.from(h));
 }
 
-function sendStatic(req, res, urlPath) {
+async function sendStatic(req, res, urlPath, params) {
   let p = decodeURIComponent(urlPath);
   if (p === '/' || p === '/index.html') {
-    const b = indexHtml();
-    res.writeHead(200, { ...SEC, 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-cache', 'Content-Length': b.length });
+    // obvezna koda za vstop: brez veljavne kode dobi obiskovalec samo stran za vstop
+    const g = await entryGate(store, env, params, req.headers.cookie);
+    const h = { ...SEC, 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' };
+    if (g.setCode) h['Set-Cookie'] = `ezz_vstop=${g.setCode}; Path=/; Max-Age=2592000; SameSite=Lax`;
+    const b = g.ok ? indexHtml() : fs.readFileSync(path.join(PUBLIC, 'vstop.html'));
+    h['Content-Length'] = b.length;
+    res.writeHead(g.ok ? 200 : 403, h);
     return res.end(req.method === 'HEAD' ? undefined : b);
   }
   const file = path.normalize(path.join(PUBLIC, p));
@@ -111,7 +116,7 @@ http.createServer(async (req, res) => {
     if (u.pathname === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
     if (u.pathname.startsWith('/api/')) return await sendApi(req, res);
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
-    sendStatic(req, res, u.pathname);
+    await sendStatic(req, res, u.pathname, u.searchParams);
   } catch (e) {
     console.error(e);
     if (!res.headersSent) res.writeHead(500);

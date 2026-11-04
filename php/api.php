@@ -203,6 +203,26 @@ function name_taken($day, $name, $pk) {
   return false;
 }
 
+// ---------- obvezna koda za vstop ----------
+function norm_entry($v) { $t = preg_replace('/[^A-Z0-9]/', '', strtoupper((string)$v)); return strlen($t) === 8 ? substr($t, 0, 4) . '-' . substr($t, 4) : null; }
+function valid_entry($code) {
+  if (!$code || !preg_match('/^[A-Z0-9]{4}-[A-Z0-9]{4}$/', $code)) return false;
+  if (get_doc('cards/' . $code) !== null) return true;
+  $e = get_doc('entry/' . $code);
+  return $e !== null && g($e, 'active', true) !== false;
+}
+function entry_required() { $c = get_doc('config/game'); return $c && g($c, 'entryRequired'); }
+function cookie_path() { $d = str_replace('\\', '/', dirname(isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '/')); return rtrim($d, '/') . '/'; }
+// vrne true, če sme obiskovalec odpreti igro; $set dobi kodo, ki jo shranimo v piškotek
+function entry_gate(&$set) {
+  $set = null;
+  if (!entry_required()) return true;
+  if (verify_token(isset($_COOKIE['ezz_adm']) ? $_COOKIE['ezz_adm'] : '')) return true;
+  $u = isset($_GET['vstop']) ? $_GET['vstop'] : (isset($_GET['k']) ? $_GET['k'] : '');
+  if ($u !== '') { $c = norm_entry($u); if ($c && valid_entry($c)) { $set = $c; return true; } return false; }
+  return valid_entry(norm_entry(isset($_COOKIE['ezz_vstop']) ? $_COOKIE['ezz_vstop'] : ''));
+}
+
 function body($limit) {
   $t = file_get_contents('php://input', false, null, 0, $limit + 1);
   if ($t === false) $t = '';
@@ -214,6 +234,7 @@ function body($limit) {
 }
 
 // ---------- obdelava zahtevka ----------
+if (defined('EZZ_GATE')) return; // index.php uporabi samo funkcije
 try {
   $route = isset($_GET['r']) ? (string)$_GET['r'] : (isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : '');
   $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
@@ -251,6 +272,7 @@ try {
     if ($op === 'update' && $old === null) out(400, array('error' => 'invalid_argument'));
     $merged = $op === 'update' ? array_merge($old, $data) : $data;
     if (!can_write($p, $op, $merged, $old !== null, $ctx)) out(403, array('error' => 'invalid_argument'));
+    if (!$ctx['admin'] && preg_match('#^(scores|contacts|feedback)/#', $p) && entry_required() && !valid_entry(norm_entry(isset($_COOKIE['ezz_vstop']) ? $_COOKIE['ezz_vstop'] : ''))) out(403, array('error' => 'entry_required'));
     if (!$ctx['admin'] && strpos($p, 'scores/') === 0 && $op === 'set') {
       $cfg = get_doc('config/game') ?: array();
       $maxTries = (int)g($cfg, 'maxTries', 3);

@@ -33,14 +33,15 @@ p{margin:0}.muted{color:var(--muted);font-size:13px}.err{color:var(--bad)}
 </main>
 <script>
 const $=s=>document.querySelector(s);
+const CP='; Path='+location.pathname.replace(/[^/]*$/,'')+'; SameSite=Lax',admCookie=t=>{document.cookie='ezz_adm='+(t?encodeURIComponent(t)+CP+'; Max-Age=43200':CP+'; Max-Age=0')};
 const API=document.documentElement.getAttribute('data-api')||'/api',api=p=>/\.php$/.test(API)?API+'?r='+encodeURIComponent(p):API+p;
 function loggedIn(){try{return !!sessionStorage.getItem('ezz-admin')}catch(e){return false}}
-function render(){if(loggedIn()){$('#t').textContent='Prijavljen kot organizator';$('#form').hidden=true;$('#go').textContent='Odpri igro';$('#go').onclick=()=>{location.href='./'};
-  if(!$('#out')){const b=document.createElement('button');b.id='out';b.className='sec';b.textContent='Odjava';b.onclick=async()=>{try{await fetch(api('/logout'),{method:'POST',headers:{'X-Admin':sessionStorage.getItem('ezz-admin')||''}})}catch(e){}sessionStorage.removeItem('ezz-admin');location.reload()};$('#go').after(b)}}
+function render(){if(loggedIn()){try{admCookie(sessionStorage.getItem('ezz-admin'))}catch(e){}$('#t').textContent='Prijavljen kot organizator';$('#form').hidden=true;$('#go').textContent='Odpri igro';$('#go').onclick=()=>{location.href='./'};
+  if(!$('#out')){const b=document.createElement('button');b.id='out';b.className='sec';b.textContent='Odjava';b.onclick=async()=>{try{await fetch(api('/logout'),{method:'POST',headers:{'X-Admin':sessionStorage.getItem('ezz-admin')||''}})}catch(e){}sessionStorage.removeItem('ezz-admin');admCookie(null);location.reload()};$('#go').after(b)}}
   else{$('#go').onclick=login;$('#pw').onkeydown=e=>{if(e.key==='Enter')login()};$('#pw').focus()}}
 async function login(){const err=$('#err');err.hidden=true;$('#go').disabled=true;
   try{const r=await fetch(api('/login'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('#pw').value})});const j=await r.json();
-    if(!r.ok){err.textContent=r.status===429?'Preveč poskusov. Počakaj minuto.':'Napačno geslo.';err.hidden=false}else{sessionStorage.setItem('ezz-admin',j.token);render()}}
+    if(!r.ok){err.textContent=r.status===429?'Preveč poskusov. Počakaj minuto.':'Napačno geslo.';err.hidden=false}else{sessionStorage.setItem('ezz-admin',j.token);admCookie(j.token);render()}}
   catch(e){err.textContent='Strežnik ni dosegljiv.';err.hidden=false}
   $('#go').disabled=false}
 render();

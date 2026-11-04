@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="sl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Vstop · Enota za zveze</title>
+<style>
+:root{--bg:#191c12;--panel:#232817;--line:#4a5333;--fg:#e4dcbf;--muted:#a39d7c;--accent:#d2b24a;--bad:#e3604f;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
+.card{width:min(440px,100%);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:24px;display:flex;flex-direction:column;gap:14px;text-align:center}
+.eyebrow{font:11px ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1{margin:0;font-size:26px;letter-spacing:.06em;text-transform:uppercase}
+p{margin:0;color:var(--muted)}
+.qr{width:72px;height:72px;margin:4px auto;border:3px solid var(--fg);border-radius:8px;position:relative}
+.qr:before,.qr:after{content:'';position:absolute;width:18px;height:18px;border:3px solid var(--fg)}
+.qr:before{left:8px;top:8px}.qr:after{right:8px;bottom:8px}
+input{width:100%;font:600 20px ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;text-align:center;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:12px}
+button{font:600 15px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;background:var(--accent);color:#1a160a;border:0;border-radius:4px;padding:12px;cursor:pointer}
+.err{color:var(--bad)}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="eyebrow">Nagradna igra</div>
+  <h1>Enota za zveze</h1>
+  <div class="qr" aria-hidden="true"></div>
+  <p>Za vstop v igro skeniraj QR kodo s kamero telefona. Kodo dobiš pri organizatorju.</p>
+  <p class="err" id="err" hidden>Ta koda ni veljavna. Preveri jo ali skeniraj znova.</p>
+  <label for="c" class="eyebrow" style="color:var(--muted)">ali vpiši kodo</label>
+  <input id="c" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7Q2-M9XF">
+  <button id="go">Vstopi</button>
+</main>
+<script>
+(function(){
+  var q=new URLSearchParams(location.search),inp=document.getElementById('c');
+  if(q.get('vstop')||q.get('k'))document.getElementById('err').hidden=false;
+  function go(){var t=inp.value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(t.length!==8){inp.focus();return}
+    location.href=location.pathname+'?vstop='+t.slice(0,4)+'-'+t.slice(4)}
+  document.getElementById('go').onclick=go;inp.onkeydown=function(e){if(e.key==='Enter')go()};
+})();
+</script>
+</body>
+</html>
